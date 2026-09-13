@@ -274,14 +274,7 @@ jobs:
             adb install -r build/exec/native-shell/analytic-continuation/analytic-continuation-direct-dex.apk
             adb logcat -c
             adb shell am start -S -W -n org.isomorphisms.analyticcontinuation/.ExplorerActivity
-            if timeout 20 bash -c 'until adb logcat -d | grep -Fq "holomorphic field ready:"; do sleep 1; done'; then
-              :
-            else
-              ready_status=$?
-              adb logcat -d > build/exec/native-shell/analytic-continuation/real-app-emulator.log || true
-              adb exec-out screencap -p > build/exec/native-shell/analytic-continuation/real-app-emulator.png || true
-              exit "$ready_status"
-            fi
+            timeout 20 bash -c 'until adb logcat -d | grep -Fq "holomorphic field ready:"; do sleep 1; done' || { ready_status=$?; adb logcat -d > build/exec/native-shell/analytic-continuation/real-app-emulator.log || true; adb exec-out screencap -p > build/exec/native-shell/analytic-continuation/real-app-emulator.png || true; exit "$ready_status"; }
             sleep 3
             adb logcat -d > build/exec/native-shell/analytic-continuation/real-app-emulator.log
             adb exec-out screencap -p > build/exec/native-shell/analytic-continuation/real-app-emulator.png
