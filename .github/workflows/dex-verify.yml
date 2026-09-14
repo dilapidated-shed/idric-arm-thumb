@@ -13,32 +13,21 @@ env:
   IDRIC_COMPILER_REF: Idriç
 
 jobs:
-  debian-host:
-    name: Debian 13 host / DEX
+  ubuntu-host:
+    name: Ubuntu 24.04 host / DEX
     runs-on: ubuntu-24.04
-    container:
-      image: debian:13-slim
     steps:
-      - name: Install minimal Debian checkout tools
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git
-          rm -rf /var/lib/apt/lists/*
-
       - name: Check out DEX backend
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Trust checked-out workspace inside Debian container
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
       - name: Confirm supported host userspace
         run: |
           . /etc/os-release
-          test "$ID" = debian
-          test "$VERSION_ID" = 13
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = 24.04
           printf 'host userspace %s %s\n' "$ID" "$VERSION_ID"
 
       - name: Test ART provenance gate
@@ -54,13 +43,12 @@ jobs:
           ref: ${{ env.IDRIC_COMPILER_REF }}
           path: Idric
 
-      - name: Install Debian host build tools
+      - name: Install Ubuntu host build tools
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
             bash build-essential ca-certificates chezscheme curl \
             default-jre-headless file libgmp-dev python3
-          rm -rf /var/lib/apt/lists/*
           java -version
           python3 --version
 
@@ -100,7 +88,7 @@ jobs:
 
   android-emulator-sanity:
     name: Android ART sanity / x86_64 emulator
-    needs: debian-host
+    needs: ubuntu-host
     runs-on: ubuntu-24.04
     steps:
       - name: Check out DEX backend
@@ -169,7 +157,7 @@ jobs:
 
   real-native-app-direct-dex:
     name: Direct DEX + real native explorers / x86_64 emulator
-    needs: debian-host
+    needs: ubuntu-host
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
