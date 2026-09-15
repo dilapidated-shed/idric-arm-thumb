@@ -1,0 +1,69 @@
+name: ICU DEX data-shape probe
+
+on:
+  push:
+    branches:
+      - dex/icu-data-shape-probe
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checked-anf:
+    name: ICU constructors and cases / checked ANF
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out DEX backend
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check out current Idriç
+        uses: actions/checkout@v4
+        with:
+          repository: isomorphisms/Idric
+          ref: Idriç
+          path: Idric
+
+      - name: Install host build inputs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential ca-certificates chezscheme curl \
+            default-jre-headless git libgmp-dev python3
+
+      - name: Build current compiler and DEX driver
+        run: |
+          make -C Idric bootstrap SCHEME=chezscheme
+          make -C Idric build/exec/idris2
+          IDRIC="$GITHUB_WORKSPACE/Idric/build/exec/idris2" \
+            IDRIC_REPO="$GITHUB_WORKSPACE/Idric" \
+            make driver
+
+      - name: Capture first unsupported ICU data form
+        run: |
+          set +e
+          IDRIS2_PATH="$GITHUB_WORKSPACE/build/ttc:${IDRIS2_PATH:-}" \
+            ./build/exec/idric-dex --cg dex --source-dir examples \
+            examples/DexIcuDataShape.idric -o icu-data-shape \
+            >build/exec/icu-data-shape.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          test -f build/exec/icu-data-shape.checked.anf
+          grep -q 'dex rejected checked program' build/exec/icu-data-shape.log
+          printf '%s\n' '--- lowering failure ---'
+          cat build/exec/icu-data-shape.log
+          printf '%s\n' '--- checked ANF ---'
+          cat build/exec/icu-data-shape.checked.anf
+
+      - name: Retain checked data-shape evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: icu-data-shape-probe
+          path: |
+            build/exec/icu-data-shape.checked.anf
+            build/exec/icu-data-shape.log
+          if-no-files-found: warn
