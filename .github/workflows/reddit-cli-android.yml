@@ -93,6 +93,8 @@ jobs:
           path: build/exec/reddit
 
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install Android NDK
         run: yes | sdkmanager "platforms;android-29" "ndk;${NDK_VERSION}"
