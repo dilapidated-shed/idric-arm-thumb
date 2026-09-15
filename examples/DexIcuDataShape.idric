@@ -1,0 +1,31 @@
+module DexIcuDataShape
+
+%default total
+
+data Command
+  = Get String
+  | Post String String
+
+parse_command : List String -> Either String Command
+parse_command ["get", text] = Right (Get text)
+parse_command ["post", text, body] = Right (Post text body)
+parse_command _ = Left "usage"
+
+%export "dex:parse_two"
+parse_two : String -> String -> Int32
+parse_two first second =
+  case parse_command [first, second] of
+    Left _ => 0
+    Right (Get text) => if text == second then 1 else 2
+    Right (Post _ _) => 3
+
+%export "dex:parse_three"
+parse_three : String -> String -> String -> Int32
+parse_three first second third =
+  case parse_command [first, second, third] of
+    Left _ => 0
+    Right (Get _) => 1
+    Right (Post text body) =>
+      if text == second
+        then if body == third then 2 else 3
+        else 4
