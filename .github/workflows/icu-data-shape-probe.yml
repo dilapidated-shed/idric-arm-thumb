@@ -35,15 +35,22 @@ jobs:
 
       - name: Build current compiler and DEX driver
         run: |
-          make -C Idric bootstrap SCHEME=chezscheme
-          make -C Idric build/exec/idris2
-          IDRIC="$GITHUB_WORKSPACE/Idric/build/exec/idris2" \
+          compiler="$GITHUB_WORKSPACE/Idric/_/build/exec/idris2"
+          if [ ! -x "$compiler" ]; then
+            "$GITHUB_WORKSPACE/Idric/_/edric" bootstrap
+          fi
+          "$compiler" --version
+          make -C "$GITHUB_WORKSPACE/Idric/_/support/chez" install IDRIS2_VERSION=0.8.0
+          make -C "$GITHUB_WORKSPACE/Idric/_" install-bootstrap-libs IDRIS2="$compiler"
+          make -C "$GITHUB_WORKSPACE/Idric/_" install-api IDRIS2_BOOT="$compiler"
+          IDRIC="$compiler" \
             IDRIC_REPO="$GITHUB_WORKSPACE/Idric" \
-            make driver
+            make check driver
 
       - name: Capture first unsupported ICU data form
         run: |
           set +e
+          compiler="$GITHUB_WORKSPACE/Idric/_/build/exec/idris2"
           IDRIS2_PATH="$GITHUB_WORKSPACE/build/ttc:${IDRIS2_PATH:-}" \
             ./build/exec/idric-dex --cg dex --source-dir examples \
             examples/DexIcuDataShape.idric -o icu-data-shape \
