@@ -27,25 +27,20 @@ env:
 
 jobs:
   direct-dex:
-    name: Direct Reddit DEX / Debian 13
+    name: Direct Reddit DEX / Ubuntu 24.04
     runs-on: ubuntu-24.04
-    container:
-      image: debian:13-slim
     steps:
-      - name: Install checkout tools
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git
-          rm -rf /var/lib/apt/lists/*
-
       - name: Check out DEX backend
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Trust workspace
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Confirm supported host userspace
+        run: |
+          . /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = 24.04
 
       - name: Check out current Idriç
         uses: actions/checkout@v4
@@ -56,11 +51,10 @@ jobs:
 
       - name: Install host build inputs
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
             bash build-essential ca-certificates chezscheme curl \
             default-jre-headless file libgmp-dev python3
-          rm -rf /var/lib/apt/lists/*
 
       - name: Build and validate direct DEX
         env:
