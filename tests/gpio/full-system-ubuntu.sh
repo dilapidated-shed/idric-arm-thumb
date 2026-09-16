@@ -176,7 +176,7 @@ sudo cp "$initrd_source" "$initrd"
 sudo cp "$dtb_source" "$dtb"
 sudo chown "$(id -u):$(id -g)" "$kernel" "$initrd" "$dtb"
 
-truncate -s 1G "$disk"
+truncate -s 2G "$disk"
 sudo mkfs.ext4 -q -d "$rootfs" "$disk"
 sudo chown "$(id -u):$(id -g)" "$disk"
 rm -f "$serial"
