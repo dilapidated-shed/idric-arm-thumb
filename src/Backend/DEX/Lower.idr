@@ -214,12 +214,16 @@ infer_value_type (Administrative_Normal_Form_Primitive_Value _ (Str _)) state =
   Right TextValue
 infer_value_type
   (Administrative_Normal_Form_Primitive_Operation _ _ operation arguments) state =
-  case integer_binary operation of
-    Just _ => Right IntegerValue
-    Nothing =>
-      case integer_condition operation of
+  case (operation, arguments) of
+    (binary, [_, _]) =>
+      case integer_binary binary of
         Just _ => Right IntegerValue
-        Nothing => Left ("Cannot infer DEX value type for primitive " ++ show operation)
+        Nothing =>
+          case integer_condition binary of
+            Just _ => Right IntegerValue
+            Nothing =>
+              Left ("Cannot infer DEX value type for primitive " ++ show operation)
+    _ => Left ("Cannot infer DEX value type for primitive " ++ show operation)
 infer_value_type
   (Administrative_Normal_Form_Named_Function_Application _ _ name _) state =
   if is_checked_int32_less name state.integer_less_name
