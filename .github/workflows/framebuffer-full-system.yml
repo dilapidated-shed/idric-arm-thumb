@@ -27,8 +27,8 @@ jobs:
             qemu-system-arm \
             qemu-user-static
 
-      - name: Boot Debian armhf and capture the presented red display
-        run: sh tests/framebuffer/full-system-debian.sh
+      - name: Boot Ubuntu armhf and capture the presented red display
+        run: sh tests/framebuffer/full-system-ubuntu.sh
 
       - name: Retain guest receipt
         if: always()
