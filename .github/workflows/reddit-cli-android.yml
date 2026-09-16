@@ -2,7 +2,16 @@ name: reddit CLI Android
 
 on:
   push:
-    branches: [dex/reddit-cli-jni]
+    branches: [main, dex/sibling-backend-boundary]
+    paths:
+      - 'src/Backend/DEX/EncodeRedditCli.idr'
+      - 'reddit-dex.ipkg'
+      - 'tests/dex/RedditCliDexGen.idr'
+      - 'tests/dex/oracles/RedditCli.smali'
+      - 'tests/dex/reddit/**'
+      - 'tests/dex/reddit-host-acceptance.sh'
+      - 'tests/dex/run-current-head-ci.sh'
+      - '.github/workflows/reddit-cli-android.yml'
   pull_request:
     paths:
       - 'src/Backend/DEX/EncodeRedditCli.idr'
@@ -125,6 +134,8 @@ jobs:
           if-no-files-found: warn
 
       - name: Package phone and tablet bundles
+        env:
+          BACKEND_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -eu
           mkdir -p build/release/phone build/release/tablet
@@ -136,9 +147,11 @@ jobs:
             build/release/tablet/libreddit_cli.so
           cp build/exec/reddit/host-receipt.txt build/release/phone/
           cp build/exec/reddit/host-receipt.txt build/release/tablet/
-          printf 'target=phone\nabi=armeabi-v7a\nbackend_sha=%s\n' "${GITHUB_SHA}" \
+          printf 'target=phone\nabi=armeabi-v7a\nbackend_sha=%s\nworkflow_run=%s\n' \
+            "$BACKEND_SHA" "$GITHUB_RUN_ID" \
             >build/release/phone/android-receipt.txt
-          printf 'target=tablet\nabi=arm64-v8a\nbackend_sha=%s\n' "${GITHUB_SHA}" \
+          printf 'target=tablet\nabi=arm64-v8a\nbackend_sha=%s\nworkflow_run=%s\n' \
+            "$BACKEND_SHA" "$GITHUB_RUN_ID" \
             >build/release/tablet/android-receipt.txt
           tar -C build/release/phone -czf build/release/reddit-phone.tar.gz .
           tar -C build/release/tablet -czf build/release/reddit-tablet.tar.gz .
@@ -160,7 +173,10 @@ jobs:
 
   publish-prerelease:
     name: Publish pinned Cat Food inputs
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dex/reddit-cli-jni'
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/dex/sibling-backend-boundary')
     needs: android-bundles
     runs-on: ubuntu-24.04
     steps:
