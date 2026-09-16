@@ -47,7 +47,7 @@ sudo debootstrap \
     --arch=armhf \
     --variant=minbase \
     --components=main,universe \
-    --include=linux-image-generic,kmod,busybox-static \
+    --include=linux-image-generic,kmod,busybox-static,initramfs-tools \
     "$UBUNTU_SUITE" "$rootfs" "$UBUNTU_MIRROR"
 
 sudo install -m 0755 "$qemu_arm_static" "$rootfs/usr/bin/$(basename "$qemu_arm_static")"
