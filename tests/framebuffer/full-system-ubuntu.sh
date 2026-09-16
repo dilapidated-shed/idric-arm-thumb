@@ -62,6 +62,36 @@ fi
 
 sudo install -m 0755 "$program" "$rootfs/usr/local/bin/screen-red"
 
+# QEMU vexpress-a9 exposes its only block storage through the PL181 SD
+# controller. Generic distro initramfs generation does not necessarily include
+# that board-specific host driver when built off-machine. Force the host, MMC
+# core, and block layer into the guest initramfs before booting it.
+kernel_release=$(sudo sh -c "ls -1 '$rootfs/lib/modules' | sort | tail -n 1")
+[ -n "$kernel_release" ] || {
+    printf '%s\n' 'FAIL: Ubuntu armhf rootfs has no installed kernel modules' >&2
+    exit 1
+}
+
+modules_file="$rootfs/etc/initramfs-tools/modules"
+for module in armmmci mmc_core mmc_block; do
+    if sudo find "$rootfs/lib/modules/$kernel_release" -type f -name "$module.ko*" -print -quit | grep -q .; then
+        printf '%s\n' "$module" | sudo tee -a "$modules_file" >/dev/null
+    elif sudo grep -Eq "^CONFIG_$(printf '%s' "$module" | tr '[:lower:]' '[:upper:]')=y$" "$rootfs/boot/config-$kernel_release" 2>/dev/null; then
+        :
+    elif [ "$module" = armmmci ] && sudo grep -q '^CONFIG_MMC_ARMMMCI=y$' "$rootfs/boot/config-$kernel_release" 2>/dev/null; then
+        :
+    elif [ "$module" = mmc_core ] && sudo grep -q '^CONFIG_MMC=y$' "$rootfs/boot/config-$kernel_release" 2>/dev/null; then
+        :
+    elif [ "$module" = mmc_block ] && sudo grep -q '^CONFIG_MMC_BLOCK=y$' "$rootfs/boot/config-$kernel_release" 2>/dev/null; then
+        :
+    else
+        printf 'FAIL: guest kernel lacks required vexpress storage module or built-in support: %s\n' "$module" >&2
+        exit 1
+    fi
+done
+
+sudo chroot "$rootfs" /usr/sbin/update-initramfs -u -k "$kernel_release"
+
 sudo tee "$rootfs/usr/local/sbin/device-action-init" >/dev/null <<'GUEST_INIT'
 #!/bin/busybox sh
 
@@ -101,9 +131,9 @@ exit "$status"
 GUEST_INIT
 sudo chmod 0755 "$rootfs/usr/local/sbin/device-action-init"
 
-kernel_source=$(find "$rootfs/boot" -maxdepth 1 -type f -name 'vmlinuz-*' | sort | tail -n 1)
-initrd_source=$(find "$rootfs/boot" -maxdepth 1 -type f -name 'initrd.img-*' | sort | tail -n 1)
-dtb_source=$(find "$rootfs" -type f -name 'vexpress-v2p-ca9.dtb' | sort | head -n 1)
+kernel_source=$(sudo find "$rootfs/boot" -maxdepth 1 -type f -name 'vmlinuz-*' | sort | tail -n 1)
+initrd_source=$(sudo find "$rootfs/boot" -maxdepth 1 -type f -name 'initrd.img-*' | sort | tail -n 1)
+dtb_source=$(sudo find "$rootfs" -type f -name 'vexpress-v2p-ca9.dtb' | sort | head -n 1)
 
 [ -n "$kernel_source" ] && [ -n "$initrd_source" ] && [ -n "$dtb_source" ] || {
     printf '%s\n' 'FAIL: Ubuntu armhf rootfs did not provide the generic kernel/initrd/vexpress-a9 DTB tuple' >&2
