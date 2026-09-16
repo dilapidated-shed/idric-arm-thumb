@@ -23,6 +23,7 @@ jobs:
             clang \
             debootstrap \
             e2fsprogs \
+            gcc-arm-linux-gnueabihf \
             lld \
             qemu-system-arm \
             qemu-user-static
