@@ -7,15 +7,14 @@ repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 UBUNTU_SUITE=${UBUNTU_SUITE:-noble}
 UBUNTU_MIRROR=${UBUNTU_MIRROR:-http://ports.ubuntu.com/ubuntu-ports}
 QEMU_SYSTEM_ARM=${QEMU_SYSTEM_ARM:-qemu-system-arm}
-ARM_CLANG=${ARM_CLANG:-clang}
-ARM_EXEC_TARGET=${ARM_EXEC_TARGET:-armv7a-linux-gnueabihf}
+ARM_CC=${ARM_CC:-arm-linux-gnueabihf-gcc}
 
 work=${WORK_DIR:-"$repo_root/build/full-system-arm-speaker"}
 rootfs="$work/rootfs"
 disk="$work/ubuntu-armhf.raw"
 serial="$work/serial.log"
 audio="$work/tone.wav"
-program="$work/speaker-tone.armv7-thumb2"
+program="$work/speaker-tone-alsa.armhf"
 kernel="$work/vmlinuz"
 initrd="$work/initrd.img"
 dtb="$work/vexpress-v2p-ca9.dtb"
@@ -23,7 +22,7 @@ dtb="$work/vexpress-v2p-ca9.dtb"
 rm -rf "$work"
 mkdir -p "$work"
 
-for command in debootstrap mkfs.ext4 python3 "$QEMU_SYSTEM_ARM" "$ARM_CLANG"; do
+for command in debootstrap mkfs.ext4 python3 "$QEMU_SYSTEM_ARM" "$ARM_CC"; do
     command -v "$command" >/dev/null 2>&1 || {
         printf 'FAIL: required command not found: %s\n' "$command" >&2
         exit 1
@@ -36,31 +35,32 @@ qemu_arm_static=$(command -v qemu-arm-static 2>/dev/null || command -v qemu-armh
     exit 1
 }
 
-"$ARM_CLANG" --target="$ARM_EXEC_TARGET" -fuse-ld=lld -nostdlib -static \
-    -march=armv7-a -mthumb \
-    -Wl,-e,_start -Wl,--no-dynamic-linker \
-    "$script_dir/speaker_tone.S" -o "$program"
-
 sudo debootstrap \
     --foreign \
     --arch=armhf \
     --variant=minbase \
     --components=main,universe \
-    --include=linux-image-generic,kmod,busybox-static,initramfs-tools \
+    --include=linux-image-generic,kmod,busybox-static,initramfs-tools,libasound2-dev \
     "$UBUNTU_SUITE" "$rootfs" "$UBUNTU_MIRROR"
 
 sudo install -m 0755 "$qemu_arm_static" "$rootfs/usr/bin/$(basename "$qemu_arm_static")"
-
 if [ -d /proc/sys/fs/binfmt_misc ]; then
     sudo update-binfmts --enable qemu-arm 2>/dev/null || true
 fi
 
 if ! sudo chroot "$rootfs" /debootstrap/debootstrap --second-stage; then
-    printf '%s\n' 'FAIL: Ubuntu armhf second-stage bootstrap did not execute; qemu-arm binfmt must be active' >&2
+    printf '%s\n' 'FAIL: Ubuntu armhf second-stage bootstrap did not execute' >&2
     exit 1
 fi
 
-sudo install -m 0755 "$program" "$rootfs/usr/local/bin/speaker-tone"
+"$ARM_CC" -std=c11 -Wall -Wextra -Werror -O2 \
+    -idirafter "$rootfs/usr/include" \
+    "$script_dir/speaker_tone_alsa.c" \
+    -L"$rootfs/usr/lib/arm-linux-gnueabihf" \
+    -Wl,-rpath-link,"$rootfs/lib/arm-linux-gnueabihf" \
+    -Wl,-rpath-link,"$rootfs/usr/lib/arm-linux-gnueabihf" \
+    -lasound -o "$program"
+sudo install -m 0755 "$program" "$rootfs/usr/local/bin/speaker-tone-alsa"
 
 kernel_release=$(sudo sh -c "ls -1 '$rootfs/lib/modules' | sort | tail -n 1")
 [ -n "$kernel_release" ] || {
@@ -68,6 +68,9 @@ kernel_release=$(sudo sh -c "ls -1 '$rootfs/lib/modules' | sort | tail -n 1")
     exit 1
 }
 
+# Keep the off-machine initramfs small and deterministic. Only the modules
+# needed to find and mount the PL181/MMC ext4 root belong in the early image.
+printf '%s\n' 'MODULES=list' | sudo tee "$rootfs/etc/initramfs-tools/conf.d/idric-device-oracle" >/dev/null
 modules_file="$rootfs/etc/initramfs-tools/modules"
 require_boot_module() {
     module=$1
@@ -77,17 +80,14 @@ require_boot_module() {
     elif sudo grep -q "^$config=y$" "$rootfs/boot/config-$kernel_release" 2>/dev/null; then
         :
     else
-        printf 'FAIL: guest kernel lacks required boot storage support: %s / %s\n' "$module" "$config" >&2
+        printf 'FAIL: guest kernel lacks required boot support: %s / %s\n' "$module" "$config" >&2
         exit 1
     fi
 }
-
-# vexpress-a9 has no IDE/SCSI/PCI root-storage path: QEMU exposes a PL181 SD
-# controller, so its host, MMC core, and block layer must be usable before the
-# root filesystem can mount.
 require_boot_module armmmci CONFIG_MMC_ARMMMCI
 require_boot_module mmc_core CONFIG_MMC
 require_boot_module mmc_block CONFIG_MMC_BLOCK
+require_boot_module ext4 CONFIG_EXT4_FS
 sudo chroot "$rootfs" /usr/sbin/update-initramfs -u -k "$kernel_release"
 
 sudo tee "$rootfs/usr/local/sbin/device-action-init" >/dev/null <<'GUEST_INIT'
@@ -100,26 +100,26 @@ exec </dev/console >/dev/console 2>&1
 /bin/busybox mount -t sysfs sysfs /sys 2>/dev/null || true
 
 /sbin/modprobe snd-aaci 2>/dev/null || /sbin/modprobe snd_aaci 2>/dev/null || true
-/sbin/modprobe snd-pcm-oss 2>/dev/null || /sbin/modprobe snd_pcm_oss 2>/dev/null || true
 
 i=0
-while [ ! -e /dev/dsp ] && [ "$i" -lt 20 ]; do
+while [ ! -e /dev/snd/pcmC0D0p ] && [ "$i" -lt 20 ]; do
     /bin/busybox sleep 1
     i=$((i + 1))
 done
 
-if [ ! -e /dev/dsp ]; then
-    echo 'AUDIO_DEVICE_PRESENT=0'
+if [ ! -e /dev/snd/pcmC0D0p ]; then
+    echo 'ALSA_PCM_PRESENT=0'
     echo 'PROGRAM_STATUS=125'
     cat /proc/asound/cards 2>/dev/null || true
+    find /dev/snd -maxdepth 1 -type c -print 2>/dev/null || true
     /bin/busybox poweroff -f
     /bin/busybox sleep 5
     exit 125
 fi
 
-echo 'AUDIO_DEVICE_PRESENT=1'
+echo 'ALSA_PCM_PRESENT=1'
 echo 'SPEAKER_TONE_RUNNING=1'
-/usr/local/bin/speaker-tone
+/usr/local/bin/speaker-tone-alsa plughw:0,0
 status=$?
 echo "PROGRAM_STATUS=$status"
 cat /proc/asound/cards 2>/dev/null || true
@@ -134,9 +134,8 @@ sudo chmod 0755 "$rootfs/usr/local/sbin/device-action-init"
 kernel_source=$(sudo find "$rootfs/boot" -maxdepth 1 -type f -name 'vmlinuz-*' | sort | tail -n 1)
 initrd_source=$(sudo find "$rootfs/boot" -maxdepth 1 -type f -name 'initrd.img-*' | sort | tail -n 1)
 dtb_source=$(sudo find "$rootfs" -type f -name 'vexpress-v2p-ca9.dtb' | sort | head -n 1)
-
 [ -n "$kernel_source" ] && [ -n "$initrd_source" ] && [ -n "$dtb_source" ] || {
-    printf '%s\n' 'FAIL: Ubuntu armhf rootfs did not provide the generic kernel/initrd/vexpress-a9 DTB tuple' >&2
+    printf '%s\n' 'FAIL: Ubuntu armhf rootfs did not provide kernel/initrd/DTB' >&2
     exit 1
 }
 
@@ -148,7 +147,6 @@ sudo chown "$(id -u):$(id -g)" "$kernel" "$initrd" "$dtb"
 truncate -s 2G "$disk"
 sudo mkfs.ext4 -q -d "$rootfs" "$disk"
 sudo chown "$(id -u):$(id -g)" "$disk"
-
 rm -f "$serial" "$audio"
 
 "$QEMU_SYSTEM_ARM" \
@@ -201,7 +199,7 @@ cleanup_qemu
 trap - EXIT HUP INT TERM
 
 cat "$serial"
-grep -q 'AUDIO_DEVICE_PRESENT=1' "$serial"
+grep -q 'ALSA_PCM_PRESENT=1' "$serial"
 grep -q 'PROGRAM_STATUS=0' "$serial"
 
 python3 - "$audio" <<'PY'
@@ -209,18 +207,14 @@ import array
 import sys
 import wave
 
-path = sys.argv[1]
-with wave.open(path, "rb") as wav:
+with wave.open(sys.argv[1], "rb") as wav:
     channels = wav.getnchannels()
     width = wav.getsampwidth()
     rate = wav.getframerate()
     frames = wav.readframes(wav.getnframes())
 
-if width != 2:
-    raise SystemExit(f"FAIL: expected QEMU WAV s16 samples, got width={width}")
-if channels < 1:
-    raise SystemExit("FAIL: WAV has no channels")
-
+if width != 2 or channels < 1:
+    raise SystemExit("FAIL: unexpected QEMU WAV format")
 samples = array.array("h")
 samples.frombytes(frames)
 if sys.byteorder != "little":
@@ -237,9 +231,6 @@ active_indices = [i for i, value in enumerate(mono) if abs(value) >= threshold]
 if not active_indices:
     raise SystemExit("FAIL: no active captured audio")
 
-# Ignore isolated QEMU/device startup and shutdown clicks. Build clusters of
-# threshold-crossing samples, allowing up to 20 ms between active samples, and
-# analyze the cluster containing the most actual active samples.
 max_gap = max(1, rate // 50)
 clusters = []
 start = previous = active_indices[0]
@@ -272,6 +263,6 @@ if not 350 <= frequency <= 450:
 PY
 
 printf '%s\n' \
-    'PASS: native ARMv7/Thumb-2 ELF executed through an Ubuntu armhf guest audio device' \
-    'PASS: guest exposed /dev/dsp through the Linux audio stack' \
+    'PASS: native ARMv7 ALSA program executed through an Ubuntu armhf guest audio device' \
+    'PASS: guest exposed the PL041 playback PCM through the supported ALSA stack' \
     'PASS: QEMU WAV capture contains the expected bounded ~400 Hz tone'
