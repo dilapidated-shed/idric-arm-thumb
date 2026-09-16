@@ -61,6 +61,10 @@ kernel_release=$(sudo sh -c "ls -1 '$rootfs/lib/modules' | sort | tail -n 1")
     printf '%s\n' 'FAIL: Ubuntu armhf rootfs has no installed kernel modules' >&2
     exit 1
 }
+
+# Keep the off-machine initramfs small and deterministic. Only the modules
+# needed to find and mount the PL181/MMC ext4 root belong in the early image.
+printf '%s\n' 'MODULES=list' | sudo tee "$rootfs/etc/initramfs-tools/conf.d/idric-device-oracle" >/dev/null
 modules_file="$rootfs/etc/initramfs-tools/modules"
 require_boot_module() {
     module=$1
@@ -70,13 +74,14 @@ require_boot_module() {
     elif sudo grep -q "^$config=y$" "$rootfs/boot/config-$kernel_release" 2>/dev/null; then
         :
     else
-        printf 'FAIL: guest kernel lacks required boot storage support: %s / %s\n' "$module" "$config" >&2
+        printf 'FAIL: guest kernel lacks required boot support: %s / %s\n' "$module" "$config" >&2
         exit 1
     fi
 }
 require_boot_module armmmci CONFIG_MMC_ARMMMCI
 require_boot_module mmc_core CONFIG_MMC
 require_boot_module mmc_block CONFIG_MMC_BLOCK
+require_boot_module ext4 CONFIG_EXT4_FS
 sudo chroot "$rootfs" /usr/sbin/update-initramfs -u -k "$kernel_release"
 
 sudo tee "$rootfs/usr/local/sbin/device-action-init" >/dev/null <<'GUEST_INIT'
