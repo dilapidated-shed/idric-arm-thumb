@@ -14,7 +14,7 @@ work=${WORK_DIR:-"$repo_root/build/full-system-arm-red"}
 rootfs="$work/rootfs"
 disk="$work/debian-armhf.raw"
 serial="$work/serial.log"
-monitor="$work/monitor.sock"
+monitor="${TMPDIR:-/tmp}/idric-arm-red-$$.sock"
 screen="$work/red.ppm"
 program="$work/linux-fbdev-red.armv7-thumb2"
 kernel="$work/vmlinuz"
@@ -141,6 +141,7 @@ cleanup_qemu() {
         kill "$qemu_pid" 2>/dev/null || true
         wait "$qemu_pid" 2>/dev/null || true
     fi
+    rm -f "$monitor"
 }
 trap cleanup_qemu EXIT HUP INT TERM
 
