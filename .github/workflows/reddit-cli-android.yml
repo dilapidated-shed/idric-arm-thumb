@@ -141,20 +141,27 @@ jobs:
           mkdir -p build/release/phone build/release/tablet
           cp build/exec/reddit/classes.dex build/release/phone/
           cp build/exec/reddit/classes.dex build/release/tablet/
+          chmod 0444 \
+            build/release/phone/classes.dex \
+            build/release/tablet/classes.dex
+          test ! -w build/release/phone/classes.dex
+          test ! -w build/release/tablet/classes.dex
           cp build/exec/reddit/libreddit_cli-armeabi-v7a.so \
             build/release/phone/libreddit_cli.so
           cp build/exec/reddit/libreddit_cli-arm64-v8a.so \
             build/release/tablet/libreddit_cli.so
           cp build/exec/reddit/host-receipt.txt build/release/phone/
           cp build/exec/reddit/host-receipt.txt build/release/tablet/
-          printf 'target=phone\nabi=armeabi-v7a\nbackend_sha=%s\nworkflow_run=%s\n' \
+          printf 'target=phone\nabi=armeabi-v7a\nbackend_sha=%s\nworkflow_run=%s\ndex_read_only=yes\n' \
             "$BACKEND_SHA" "$GITHUB_RUN_ID" \
             >build/release/phone/android-receipt.txt
-          printf 'target=tablet\nabi=arm64-v8a\nbackend_sha=%s\nworkflow_run=%s\n' \
+          printf 'target=tablet\nabi=arm64-v8a\nbackend_sha=%s\nworkflow_run=%s\ndex_read_only=yes\n' \
             "$BACKEND_SHA" "$GITHUB_RUN_ID" \
             >build/release/tablet/android-receipt.txt
           tar -C build/release/phone -czf build/release/reddit-phone.tar.gz .
           tar -C build/release/tablet -czf build/release/reddit-tablet.tar.gz .
+          tar -tzvf build/release/reddit-phone.tar.gz | grep -Eq '^[-]r--r--r-- .*\./classes.dex$'
+          tar -tzvf build/release/reddit-tablet.tar.gz | grep -Eq '^[-]r--r--r-- .*\./classes.dex$'
           (
             cd build/release
             sha256sum reddit-phone.tar.gz reddit-tablet.tar.gz > SHA256SUMS
