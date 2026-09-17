@@ -4,7 +4,7 @@ These are handwritten native Linux platform oracles for the device-action matrix
 
 - `gpio_output` requests one line as output, drives it high, then low.
 - `gpio_input` requests one line as input and prints one logical value.
-- `gpio_edge_wait` requests rising-edge detection and blocks until one event arrives.
+- `gpio_edge_wait` requests rising-edge detection, reports when the request is armed, and blocks until one event arrives.
 
 The full-system acceptance lane uses the kernel `gpio-sim` provider. The programs still talk only to the ordinary GPIO character device; the harness uses gpio-sim's independent sysfs `pull` and `value` controls to inject and observe line state.
 

@@ -42,7 +42,9 @@ static int request_one_line(const char *chip_path, unsigned int offset,
     request.num_lines = 1;
 
     if (ioctl(chip_fd, GPIO_V2_GET_LINE_IOCTL, &request) < 0) {
+        int saved_errno = errno;
         close(chip_fd);
+        errno = saved_errno;
         return -11;
     }
 

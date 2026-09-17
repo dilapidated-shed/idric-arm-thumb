@@ -154,7 +154,28 @@ echo pull-down > "$line_state/pull"
 edge_log=/tmp/gpio-edge.log
 /usr/local/bin/gpio_edge_wait "$chip" 0 >"$edge_log" &
 edge_pid=$!
-/bin/busybox sleep 0.2
+i=0
+while ! grep -q '^armed offset=0$' "$edge_log" 2>/dev/null && [ "$i" -lt 100 ]; do
+    /bin/busybox sleep 0.02
+    i=$((i + 1))
+done
+if ! grep -q '^armed offset=0$' "$edge_log"; then
+    if kill -0 "$edge_pid" 2>/dev/null; then
+        echo 'GPIO_EDGE_ARM_TIMEOUT=1'
+        printf 'GPIO_EDGE_WCHAN='
+        cat "/proc/$edge_pid/wchan" 2>/dev/null || true
+        kill -9 "$edge_pid" 2>/dev/null || true
+    else
+        set +e
+        wait "$edge_pid"
+        edge_status=$?
+        set -e
+        echo "GPIO_EDGE_ARM_STATUS=$edge_status"
+    fi
+    /bin/busybox poweroff -f
+    /bin/busybox sleep 5
+    exit 122
+fi
 echo pull-up > "$line_state/pull"
 wait "$edge_pid"
 cat "$edge_log"
