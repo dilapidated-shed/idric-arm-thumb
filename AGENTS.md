@@ -26,3 +26,10 @@ it is not native ARM/Thumb backend evidence when the native path is the claim.
 
 Temporary application harnesses must remain replaceable and must not define the
 generic backend interface merely because they were the first executable path.
+
+## Human phone acceptance
+
+When asking the human to run a terminal block on a phone and paste the result
+back, follow the shared ai-ci color convention: make section headings and
+PASS/FAIL/action markers visually distinct with ANSI color when supported, while
+keeping machine-readable receipt lines plain and never relying on color alone.
