@@ -27,8 +27,9 @@ exit-10 no-device path. User-mode QEMU is not speaker acceptance.
 
 Full-system acceptance is a separate virtual-device receipt: it boots an
 Ubuntu armhf guest on an LPAE-capable ARMv7 board, drives the emulated PL041
-through the guest ALSA stack with the same tone fixture, captures QEMU audio as
-WAV, and validates the captured frequency and duration. It does not establish
+through the guest ALSA stack with the same 400 Hz / 100-cycle / 0.25 s tone
+fixture, using the PL041-native 48 kHz S16 stereo transport, captures QEMU
+audio as WAV, and validates the captured frequency and duration. It does not establish
 that the handwritten /dev/dsp ELF, compiler-generated Idriç, or a physical
 speaker played the tone. PCM generation alone does not establish device
 playback.

@@ -120,7 +120,7 @@ fi
 
 echo 'ALSA_PCM_PRESENT=1'
 echo 'SPEAKER_TONE_RUNNING=1'
-/usr/local/bin/speaker-tone-alsa plughw:0,0
+/usr/local/bin/speaker-tone-alsa hw:0,0
 status=$?
 echo "PROGRAM_STATUS=$status"
 cat /proc/asound/cards 2>/dev/null || true
