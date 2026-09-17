@@ -1,0 +1,15 @@
+physical_device=phone
+model=MIRO A1
+abi=armeabi-v7a
+android=14
+sdk=34
+release=reddit-android-513d3515083e
+backend_sha=513d3515083edaf723a60292d8d333b7171469cb
+workflow_run=35138107496
+published_bundle_sha256=e731fbd5d34517d4f191b392ef1119e9dd3d556106cb12260e1e895825d46497
+download_checksum=pass
+initial_dex_writable=yes
+dex_read_only_before_execution=yes
+dex_jni_url_probe=pass
+aarch64_physical_execution=not_claimed
+receipt_origin=human_termux_pasteback
