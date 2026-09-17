@@ -15,7 +15,7 @@ disk="$work/ubuntu-armhf.raw"
 serial="$work/serial.log"
 kernel="$work/vmlinuz"
 initrd="$work/initrd.img"
-dtb="$work/vexpress-v2p-ca9.dtb"
+dtb="$work/vexpress-v2p-ca15-tc1.dtb"
 programs="$work/programs"
 
 rm -rf "$work"
@@ -170,7 +170,7 @@ sudo chmod 0755 "$rootfs/usr/local/sbin/device-action-init"
 
 kernel_source=$(sudo find "$rootfs/boot" -maxdepth 1 -type f -name 'vmlinuz-*' | sort | tail -n 1)
 initrd_source=$(sudo find "$rootfs/boot" -maxdepth 1 -type f -name 'initrd.img-*' | sort | tail -n 1)
-dtb_source=$(sudo find "$rootfs" -type f -name 'vexpress-v2p-ca9.dtb' | sort | head -n 1)
+dtb_source=$(sudo find "$rootfs" -type f -name 'vexpress-v2p-ca15-tc1.dtb' | sort | head -n 1)
 [ -n "$kernel_source" ] && [ -n "$initrd_source" ] && [ -n "$dtb_source" ] || {
     printf '%s\n' 'FAIL: Ubuntu armhf rootfs did not provide kernel/initrd/DTB' >&2
     exit 1
@@ -187,8 +187,8 @@ sudo chown "$(id -u):$(id -g)" "$disk"
 rm -f "$serial"
 
 "$QEMU_SYSTEM_ARM" \
-    -machine vexpress-a9 \
-    -cpu cortex-a9 \
+    -machine vexpress-a15 \
+    -cpu cortex-a15 \
     -m 512M \
     -kernel "$kernel" \
     -dtb "$dtb" \
