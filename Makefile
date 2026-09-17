@@ -75,21 +75,21 @@ inspect: examples
 	grep -q 'movw' $(OPERATIONS_ASSEMBLY)
 
 reject-invalid-int: $(DRIVER) tests/source/InvalidInt.idric
-	@IDRIS2_PATH="$(CURDIR)/build/ttc:${IDRIS2_PATH}" \
+	@IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
 		./$(DRIVER) --cg arm-thumb --source-dir tests/source \
 		tests/source/InvalidInt.idric -o invalid_int > $(INVALID_INT_LOG) 2>&1 || true
 	grep -q 'arm-thumb rejected source ABI' $(INVALID_INT_LOG)
 	grep -q 'unsupported source primitive type' $(INVALID_INT_LOG)
 
 reject-too-many-args: $(DRIVER) tests/source/TooManyArgs.idric
-	@IDRIS2_PATH="$(CURDIR)/build/ttc:${IDRIS2_PATH}" \
+	@IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
 		./$(DRIVER) --cg arm-thumb --source-dir tests/source \
 		tests/source/TooManyArgs.idric -o too_many_args > $(TOO_MANY_ARGS_LOG) 2>&1 || true
 	grep -q 'arm-thumb rejected source ABI' $(TOO_MANY_ARGS_LOG)
 	grep -q 'more than four one-word arguments' $(TOO_MANY_ARGS_LOG)
 
 reject-invalid-result: $(DRIVER) tests/source/InvalidResult.idric
-	@IDRIS2_PATH="$(CURDIR)/build/ttc:${IDRIS2_PATH}" \
+	@IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
 		./$(DRIVER) --cg arm-thumb --source-dir tests/source \
 		tests/source/InvalidResult.idric -o invalid_result > $(INVALID_RESULT_LOG) 2>&1 || true
 	grep -q 'arm-thumb rejected source ABI' $(INVALID_RESULT_LOG)
