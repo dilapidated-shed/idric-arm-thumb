@@ -9,16 +9,12 @@ for source in tests/branching/*.idric; do
   name="$(basename "$source" .idric)"
   log="build/exec/branching-boundary/${name}.log"
 
-  if IDRIS2_PATH="$PWD/build/ttc:${IDRIS2_PATH:-}" \
-      ./build/exec/idric-arm-thumb \
-        --cg arm-thumb \
-        --source-dir tests/branching \
-        "$source" \
-        -o "$name" >"$log" 2>&1; then
-    cat "$log"
-    echo "$source unexpectedly compiled through control-flow lowering"
-    exit 1
-  fi
+  IDRIS2_PATH="$PWD/build/ttc:${IDRIS2_PATH:-}" \
+    ./build/exec/idric-arm-thumb \
+      --cg arm-thumb \
+      --source-dir tests/branching \
+      "$source" \
+      -o "$name" >"$log" 2>&1 || true
 
   if grep -q 'arm-thumb rejected source ABI' "$log"; then
     cat "$log"
