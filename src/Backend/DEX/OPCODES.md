@@ -1,4 +1,4 @@
-# Complete DEX opcode inventory for the Edriç backend
+# Complete DEX opcode inventory for the Idriç backend
 
 This file is deliberately exhaustive before we implement more lowering. It accounts for every
 8-bit DEX opcode slot `0x00`–`0xff`, including currently unused slots, and the three
@@ -15,16 +15,16 @@ The public table currently defines 224 opcode slots and leaves 32 unused. DEX 03
 `const-method-type`. DEX 040 changes file-format naming rules rather than adding bytecodes.
 DEX 041 is an experimental Android 16 container format and is not a production target.
 
-For the first Edriç Android backend, **DEX 035 is the conservative baseline**. It is enough for
+For the first Idriç Android backend, **DEX 035 is the conservative baseline**. It is enough for
 the ordinary arithmetic, branch, array, object, field, and call instructions we need, and it
 avoids making a newer runtime feature part of the language by accident.
 
 ## What the status column means
 
 - **core** — directly useful for checked straight-line/control-flow lowering.
-- **android-bridge** — likely required to call Android framework code or represent DEX references; keep it below the Edriç surface.
+- **android-bridge** — likely required to call Android framework code or represent DEX references; keep it below the Idriç surface.
 - **explicit-64** — only when an explicit 64-bit value or framework signature requires it.
-- **late** — meaningful only after the corresponding Edriç semantics are specified.
+- **late** — meaningful only after the corresponding Idriç semantics are specified.
 - **avoid-unless-required** — historical/runtime machinery we should not import into the language without a concrete need.
 - **unused** — reserved opcode slot; the encoder must reject it as an instruction.
 
@@ -32,7 +32,7 @@ These statuses are planning labels, not claims that an opcode itself is good or 
 
 ## Full 256-slot map
 
-| op | mnemonic | format | family | status | Edriç/backend note |
+| op | mnemonic | format | family | status | Idriç/backend note |
 |---:|---|---|---|---|---|
 | `0x00` | `nop` | `10x` | control/layout | **core** | No semantic effect; also tags payload pseudo-instructions. |
 | `0x01` | `move` | `12x` | register move | **core** | 32-bit non-reference move; encoding choice depends on register numbers. |
@@ -41,13 +41,13 @@ These statuses are planning labels, not claims that an opcode itself is good or 
 | `0x04` | `move-wide` | `12x` | register move | **explicit-64** | 64-bit pair move; only for explicit 64-bit values/interoperability. |
 | `0x05` | `move-wide/from16` | `22x` | register move | **explicit-64** | 64-bit pair move with larger source register. |
 | `0x06` | `move-wide/16` | `32x` | register move | **explicit-64** | 64-bit pair move with large register numbers. |
-| `0x07` | `move-object` | `12x` | reference move | **android-bridge** | Reference move; backend detail, not an Edriç object model. |
+| `0x07` | `move-object` | `12x` | reference move | **android-bridge** | Reference move; backend detail, not an Idriç object model. |
 | `0x08` | `move-object/from16` | `22x` | reference move | **android-bridge** | Reference move with larger source register. |
 | `0x09` | `move-object/16` | `32x` | reference move | **android-bridge** | Reference move with large register numbers. |
 | `0x0a` | `move-result` | `11x` | call result | **android-bridge** | Must immediately follow an invocation that returns a 32-bit non-reference value. |
 | `0x0b` | `move-result-wide` | `11x` | call result | **explicit-64** | Immediate 64-bit invocation result transfer. |
 | `0x0c` | `move-result-object` | `11x` | call result | **android-bridge** | Immediate reference result transfer after invoke/filled-new-array. |
-| `0x0d` | `move-exception` | `11x` | exception | **late** | Handler-entry instruction; only relevant once Edriç exception semantics are explicit. |
+| `0x0d` | `move-exception` | `11x` | exception | **late** | Handler-entry instruction; only relevant once Idriç exception semantics are explicit. |
 | `0x0e` | `return-void` | `10x` | return | **core** | Return with no value. |
 | `0x0f` | `return` | `11x` | return | **core** | Return a 32-bit non-reference value. |
 | `0x10` | `return-wide` | `11x` | return | **explicit-64** | Return a 64-bit pair. |
@@ -62,10 +62,10 @@ These statuses are planning labels, not claims that an opcode itself is good or 
 | `0x19` | `const-wide/high16` | `21h` | constant | **explicit-64** | 64-bit literal with only high 16 bits encoded. |
 | `0x1a` | `const-string` | `21c` | constant pool | **android-bridge** | Load a string-pool reference. |
 | `0x1b` | `const-string/jumbo` | `31c` | constant pool | **android-bridge** | Same semantics with 32-bit string index. |
-| `0x1c` | `const-class` | `21c` | constant pool | **android-bridge** | Load a type/class reference; keep below Edriç surface. |
-| `0x1d` | `monitor-enter` | `11x` | monitor | **avoid-unless-required** | Java/ART monitor acquisition; do not infer Edriç concurrency semantics from it. |
+| `0x1c` | `const-class` | `21c` | constant pool | **android-bridge** | Load a type/class reference; keep below Idriç surface. |
+| `0x1d` | `monitor-enter` | `11x` | monitor | **avoid-unless-required** | Java/ART monitor acquisition; do not infer Idriç concurrency semantics from it. |
 | `0x1e` | `monitor-exit` | `11x` | monitor | **avoid-unless-required** | Java/ART monitor release. |
-| `0x1f` | `check-cast` | `21c` | runtime type | **avoid-unless-required** | Runtime reference cast check; not a model for Edriç typechecking. |
+| `0x1f` | `check-cast` | `21c` | runtime type | **avoid-unless-required** | Runtime reference cast check; not a model for Idriç typechecking. |
 | `0x20` | `instance-of` | `22c` | runtime type | **avoid-unless-required** | Runtime reference-class query. |
 | `0x21` | `array-length` | `12x` | array | **android-bridge** | Array length; useful for framework interop and an eventual array representation. |
 | `0x22` | `new-instance` | `21c` | allocation | **android-bridge** | Allocate framework/class instance; backend-only Android bridge. |
@@ -73,7 +73,7 @@ These statuses are planning labels, not claims that an opcode itself is good or 
 | `0x24` | `filled-new-array` | `35c` | allocation | **android-bridge** | Allocate/fill a small single-word-element array. |
 | `0x25` | `filled-new-array/range` | `3rc` | allocation | **android-bridge** | Range-register form of filled-new-array. |
 | `0x26` | `fill-array-data` | `31t` | array payload | **android-bridge** | Initialize primitive array from an aligned payload. |
-| `0x27` | `throw` | `11x` | exception | **late** | Needs explicit Edriç exception/effect semantics before source lowering. |
+| `0x27` | `throw` | `11x` | exception | **late** | Needs explicit Idriç exception/effect semantics before source lowering. |
 | `0x28` | `goto` | `10t` | branch | **core** | Unconditional short branch. |
 | `0x29` | `goto/16` | `20t` | branch | **core** | Same branch with wider offset. |
 | `0x2a` | `goto/32` | `30t` | branch | **core** | Same branch with 32-bit offset. |
@@ -116,20 +116,20 @@ These statuses are planning labels, not claims that an opcode itself is good or 
 | `0x4f` | `aput-byte` | `23x` | array access | **android-bridge** | Typed DEX array load/store; treat the type suffix as target representation, not source-language meaning. |
 | `0x50` | `aput-char` | `23x` | array access | **android-bridge** | Typed DEX array load/store; treat the type suffix as target representation, not source-language meaning. |
 | `0x51` | `aput-short` | `23x` | array access | **android-bridge** | Typed DEX array load/store; treat the type suffix as target representation, not source-language meaning. |
-| `0x52` | `iget` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x53` | `iget-wide` | `22c` | instance field | **explicit-64** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x54` | `iget-object` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x55` | `iget-boolean` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x56` | `iget-byte` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x57` | `iget-char` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x58` | `iget-short` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x59` | `iput` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x5a` | `iput-wide` | `22c` | instance field | **explicit-64** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x5b` | `iput-object` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x5c` | `iput-boolean` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x5d` | `iput-byte` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x5e` | `iput-char` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
-| `0x5f` | `iput-short` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Edriç surface. |
+| `0x52` | `iget` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x53` | `iget-wide` | `22c` | instance field | **explicit-64** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x54` | `iget-object` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x55` | `iget-boolean` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x56` | `iget-byte` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x57` | `iget-char` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x58` | `iget-short` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x59` | `iput` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x5a` | `iput-wide` | `22c` | instance field | **explicit-64** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x5b` | `iput-object` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x5c` | `iput-boolean` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x5d` | `iput-byte` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x5e` | `iput-char` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
+| `0x5f` | `iput-short` | `22c` | instance field | **android-bridge** | Framework/DEX field access; keep class-field mechanics below Idriç surface. |
 | `0x60` | `sget` | `21c` | static field | **android-bridge** | Framework/DEX static field access; interoperability machinery. |
 | `0x61` | `sget-wide` | `21c` | static field | **explicit-64** | Framework/DEX static field access; interoperability machinery. |
 | `0x62` | `sget-object` | `21c` | static field | **android-bridge** | Framework/DEX static field access; interoperability machinery. |
@@ -144,11 +144,11 @@ These statuses are planning labels, not claims that an opcode itself is good or 
 | `0x6b` | `sput-byte` | `21c` | static field | **android-bridge** | Framework/DEX static field access; interoperability machinery. |
 | `0x6c` | `sput-char` | `21c` | static field | **android-bridge** | Framework/DEX static field access; interoperability machinery. |
 | `0x6d` | `sput-short` | `21c` | static field | **android-bridge** | Framework/DEX static field access; interoperability machinery. |
-| `0x6e` | `invoke-virtual` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Edriç call semantics. |
-| `0x6f` | `invoke-super` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Edriç call semantics. |
-| `0x70` | `invoke-direct` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Edriç call semantics. |
-| `0x71` | `invoke-static` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Edriç call semantics. |
-| `0x72` | `invoke-interface` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Edriç call semantics. |
+| `0x6e` | `invoke-virtual` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Idriç call semantics. |
+| `0x6f` | `invoke-super` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Idriç call semantics. |
+| `0x70` | `invoke-direct` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Idriç call semantics. |
+| `0x71` | `invoke-static` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Idriç call semantics. |
+| `0x72` | `invoke-interface` | `35c` | call | **android-bridge** | DEX dispatch flavor required by callee metadata; should not determine Idriç call semantics. |
 | `0x73` | `(unused)` | `10x` | unused | **unused** | Reserved/unused opcode slot. |
 | `0x74` | `invoke-virtual/range` | `3rc` | call | **android-bridge** | Range-register encoding of the corresponding invocation. |
 | `0x75` | `invoke-super/range` | `3rc` | call | **android-bridge** | Range-register encoding of the corresponding invocation. |
@@ -286,7 +286,7 @@ These statuses are planning labels, not claims that an opcode itself is good or 
 | `0xf9` | `(unused)` | `10x` | unused | **unused** | Reserved/unused opcode slot in the public instruction set. |
 | `0xfa` | `invoke-polymorphic` | `45cc` | dynamic call | **avoid-unless-required** | DEX 038+ method-handle invocation; not needed for ordinary direct Android calls. |
 | `0xfb` | `invoke-polymorphic/range` | `4rcc` | dynamic call | **avoid-unless-required** | Range form of method-handle invocation. |
-| `0xfc` | `invoke-custom` | `35c` | dynamic call | **avoid-unless-required** | DEX 038+ call-site/bootstrap mechanism; do not import into Edriç unless demanded. |
+| `0xfc` | `invoke-custom` | `35c` | dynamic call | **avoid-unless-required** | DEX 038+ call-site/bootstrap mechanism; do not import into Idriç unless demanded. |
 | `0xfd` | `invoke-custom/range` | `3rc` | dynamic call | **avoid-unless-required** | Range form of custom call-site invocation. |
 | `0xfe` | `const-method-handle` | `21c` | dynamic call constant | **avoid-unless-required** | DEX 039+ method-handle constant. |
 | `0xff` | `const-method-type` | `21c` | dynamic call constant | **avoid-unless-required** | DEX 039+ method-prototype constant. |
@@ -317,7 +317,7 @@ DEX exposes a deliberately small control-flow surface:
 
 There is no DEX-visible condition-code register, branch prediction hint, predicated instruction,
 or conditional-select instruction. Those physical-machine choices are hidden below ART. This is
-exactly why the DEX backend is a useful comparison target: it lets us ask whether Edriç's meaning
+exactly why the DEX backend is a useful comparison target: it lets us ask whether Idriç's meaning
 of a conditional is completely captured by control-flow semantics, or whether a direct backend
 such as ARM Thumb exposes machine facts worth preserving at a lower checked-IR layer.
 
@@ -328,7 +328,7 @@ Important lowering constraints:
 - float comparison requires choosing `cmpl-*` versus `cmpg-*`; this determines the result for NaN.
 - switch payloads are out-of-line data and require alignment.
 - the DEX verifier still constrains which value kinds can legally be compared; a syntactically
-  available opcode is not permission to erase Edriç type information.
+  available opcode is not permission to erase Idriç type information.
 
 ## Register/encoding pass
 
@@ -336,7 +336,7 @@ DEX registers are method-local slots. Ordinary bit values use 32-bit registers; 
 occupy adjacent register pairs. Many encodings can name only the first 16 or 256 registers,
 which is why `move`, `/from16`, `/16`, `/range`, and `/2addr` variants exist.
 
-For Edriç this suggests a useful separation:
+For Idriç this suggests a useful separation:
 
 1. checked IR decides values, operations, and control flow;
 2. a DEX register-placement pass decides register numbers;
@@ -353,7 +353,7 @@ The opcode table makes the numeric boundary unusually clear:
 - 64-bit integer and Float64 operations use register pairs;
 - there is **no Float16 arithmetic opcode**;
 - `boolean`, `byte`, `char`, and `short` suffixes appear mainly around array/field access and
-  narrowing conversions; they should not automatically become Edriç's source type system.
+  narrowing conversions; they should not automatically become Idriç's source type system.
 
 Float64 remains an explicit exception rather than a default. If an Android framework signature
 requires it, the bridge can use the wide DEX operation without changing the source-language
@@ -362,11 +362,11 @@ numeric policy.
 ## Object/runtime machinery pass
 
 DEX includes classes, references, allocation, fields, dynamic dispatch, monitors, exceptions,
-casts, method handles, and custom call sites. Their existence does **not** imply that Edriç needs
+casts, method handles, and custom call sites. Their existence does **not** imply that Idriç needs
 corresponding source constructs.
 
 For an Android app we can treat much of this as FFI/bridge machinery generated from checked
-framework bindings. In particular, an Edriç application should not need to spell inheritance,
+framework bindings. In particular, an Idriç application should not need to spell inheritance,
 a Java class declaration, `invoke-virtual`, or a field opcode merely because Android's runtime
 requires those structures in `classes.dex`.
 
@@ -391,7 +391,7 @@ conversion edges explicitly.
 Reference moves/results/returns, string constants, `new-instance`, arrays as needed, field
 access as needed, and ordinary `invoke-direct` / `invoke-static` / `invoke-virtual` /
 `invoke-super` / `invoke-interface` forms. Generate this machinery from bindings; do not
-expose it as Java-shaped Edriç syntax.
+expose it as Java-shaped Idriç syntax.
 
 ### Slice D — switches and compact encoding
 
