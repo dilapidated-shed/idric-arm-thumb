@@ -54,6 +54,7 @@ if ! sudo chroot "$rootfs" /debootstrap/debootstrap --second-stage; then
 fi
 
 "$ARM_CC" -std=c11 -Wall -Wextra -Werror -O2 \
+    -D_POSIX_C_SOURCE=200809L \
     -idirafter "$rootfs/usr/include" \
     "$script_dir/speaker_tone_alsa.c" \
     -L"$rootfs/usr/lib/arm-linux-gnueabihf" \
