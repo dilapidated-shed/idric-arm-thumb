@@ -18,7 +18,7 @@ This conclusion does not decide how future tensor/index structure should be
 preserved. Such structure can justify a compiler form only when checked source
 operations actually require it. It is not a prerequisite for Int32 DEX work.
 
-The useful part of DEX here is its simple, inspectable register-machine shape. The goal is to borrow that clarity without importing DEX/Java semantics into Edriç.
+The useful part of DEX here is its simple, inspectable register-machine shape. The goal is to borrow that clarity without importing DEX/Java semantics into Idriç.
 
 ## Shape
 
