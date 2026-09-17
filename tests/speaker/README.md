@@ -25,7 +25,10 @@ The ordinary CI check assembles the native ARMv7 Thumb ELF, inspects it, and,
 when the host lacks `/dev/dsp`, runs it under `qemu-arm` to verify the explicit
 exit-10 no-device path. User-mode QEMU is not speaker acceptance.
 
-Full-system acceptance must boot an Ubuntu armhf guest with a declared virtual
-audio device, execute this same native ELF through that guest device stack,
-capture QEMU audio output as WAV, and validate the captured frequency and
-duration. PCM generation alone does not establish device playback.
+Full-system acceptance is a separate virtual-device receipt: it boots an
+Ubuntu armhf guest on an LPAE-capable ARMv7 board, drives the emulated PL041
+through the guest ALSA stack with the same tone fixture, captures QEMU audio as
+WAV, and validates the captured frequency and duration. It does not establish
+that the handwritten /dev/dsp ELF, compiler-generated Idriç, or a physical
+speaker played the tone. PCM generation alone does not establish device
+playback.
