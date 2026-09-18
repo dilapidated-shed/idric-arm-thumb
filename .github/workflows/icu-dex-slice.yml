@@ -11,7 +11,7 @@ env:
   ICU_REF: 6165731c69a22dc3dd191e0d83e5662fcb288262
   IDRIC_NET_REF: 73acb20b4234f88fecb003af514137edb26a4703
   IDRIC_COMPILER_REF: 9fb1a2ca26b7010310a62135d8ce33b7e0d985e5
-  COMPILER_CACHE_VERSION: v3
+  COMPILER_CACHE_VERSION: v4
 
 jobs:
   checked-icu-path:
@@ -55,6 +55,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
+            Idric/_/.tools
             Idric/_/build
             ~/.idris2
           key: idric-${{ env.COMPILER_CACHE_VERSION }}-${{ runner.os }}-24.04-${{ env.IDRIC_COMPILER_REF }}
@@ -76,6 +77,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: |
+            Idric/_/.tools
             Idric/_/build
             ~/.idris2
           key: idric-${{ env.COMPILER_CACHE_VERSION }}-${{ runner.os }}-24.04-${{ env.IDRIC_COMPILER_REF }}
