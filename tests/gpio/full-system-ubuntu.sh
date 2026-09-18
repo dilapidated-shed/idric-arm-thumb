@@ -52,11 +52,21 @@ if [ -d /proc/sys/fs/binfmt_misc ]; then
 fi
 sudo chroot "$rootfs" /debootstrap/debootstrap --second-stage
 
+# The release pocket still carries the original Noble ARM kernel. Exercise
+# gpio-sim against Noble's maintained kernel without changing the userspace
+# or the full-system evidence boundary.
+printf 'deb %s %s-updates main universe\n' "$UBUNTU_MIRROR" "$UBUNTU_SUITE" |
+    sudo tee "$rootfs/etc/apt/sources.list.d/idric-updates.list" >/dev/null
+sudo chroot "$rootfs" /usr/bin/apt-get update
+sudo chroot "$rootfs" /usr/bin/env DEBIAN_FRONTEND=noninteractive \
+    /usr/bin/apt-get install -y --no-install-recommends linux-image-generic
+sudo chroot "$rootfs" /usr/bin/apt-get clean
+
 for name in gpio_output gpio_input gpio_edge_wait; do
     sudo install -m 0755 "$programs/$name" "$rootfs/usr/local/bin/$name"
 done
 
-kernel_release=$(sudo sh -c "ls -1 '$rootfs/lib/modules' | sort | tail -n 1")
+kernel_release=$(sudo sh -c "ls -1 '$rootfs/lib/modules' | sort -V | tail -n 1")
 [ -n "$kernel_release" ] || {
     printf '%s\n' 'FAIL: Ubuntu armhf rootfs has no installed kernel modules' >&2
     exit 1
@@ -189,10 +199,11 @@ echo 'GPIO_TESTS_PASS=1'
 GUEST_INIT
 sudo chmod 0755 "$rootfs/usr/local/sbin/device-action-init"
 
-kernel_source=$(sudo find "$rootfs/boot" -maxdepth 1 -type f -name 'vmlinuz-*' | sort | tail -n 1)
-initrd_source=$(sudo find "$rootfs/boot" -maxdepth 1 -type f -name 'initrd.img-*' | sort | tail -n 1)
-dtb_source=$(sudo find "$rootfs" -type f -name 'vexpress-v2p-ca15-tc1.dtb' | sort | head -n 1)
-[ -n "$kernel_source" ] && [ -n "$initrd_source" ] && [ -n "$dtb_source" ] || {
+kernel_source="$rootfs/boot/vmlinuz-$kernel_release"
+initrd_source="$rootfs/boot/initrd.img-$kernel_release"
+dtb_source=$(sudo find "$rootfs/usr/lib/linux-image-$kernel_release" \
+    -type f -name 'vexpress-v2p-ca15-tc1.dtb' -print -quit 2>/dev/null || true)
+[ -f "$kernel_source" ] && [ -f "$initrd_source" ] && [ -n "$dtb_source" ] || {
     printf '%s\n' 'FAIL: Ubuntu armhf rootfs did not provide kernel/initrd/DTB' >&2
     exit 1
 }
