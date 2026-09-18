@@ -9,3 +9,6 @@ echo_text text = text
 %export "dex:icu_word"
 icu_word : String
 icu_word = "icu"
+
+main : IO ()
+main = pure ()
