@@ -33,3 +33,22 @@ When asking the human to run a terminal block on a phone and paste the result
 back, follow the shared ai-ci color convention: make section headings and
 PASS/FAIL/action markers visually distinct with ANSI color when supported, while
 keeping machine-readable receipt lines plain and never relying on color alone.
+
+
+## Typecheck compiler-facing changes before push
+
+For any change that touches `src/Backend/DEX/*.idr`, `backend.ipkg`, or other
+compiler-facing DEX code, run the repository preflight against the declared
+current Idriç checkout before pushing the branch:
+
+```sh
+make preflight IDRIC=/path/to/idris2 IDRIC_REPO=/path/to/Idric
+```
+
+Do not use pull-request CI as the first typecheck. A failing package typecheck or
+driver build means the branch is not ready to push or advance. Record the exact
+backend and Idriç SHAs with any acceptance claim.
+
+The preflight proves only that the backend package typechecks and its driver
+builds. It does not establish DEX generation, parser validation, ART execution,
+emulator acceptance, or physical-device acceptance.
