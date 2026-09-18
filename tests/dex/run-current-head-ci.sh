@@ -8,6 +8,7 @@ compiler_ref=${IDRIC_COMPILER_REF:-Idriç}
 compiler="$idric_support_root/build/exec/idris2"
 receipt="$repo_root/build/exec/current-head-receipt.tsv"
 log="$repo_root/build/exec/current-head.log"
+stage_log="$repo_root/build/exec/current-stage.log"
 current_stage=compiler_build
 passed='compiler_checkout'
 
@@ -22,6 +23,7 @@ compiler_dirty=$(if git -C "$idric_repo" status --porcelain | grep -q .; then pr
 
 mkdir -p "$repo_root/build/exec"
 : > "$log"
+: > "$stage_log"
 
 write_receipt() {
   outcome=$1
@@ -60,8 +62,8 @@ write_receipt() {
 fail_receipt() {
   status=$?
   trap - ERR
-  diagnostic=$(grep -E '(^FAIL|^Error:|^usage:|unsupported|rejected|not found|No such file)' "$log" | tail -n 1 || true)
-  [[ -n $diagnostic ]] || diagnostic=$(tail -n 1 "$log" | tr '\t\r\n' '   ')
+  diagnostic=$(grep -E '(^FAIL|^Error:|^usage:|unsupported|rejected|not found|No such file)' "$stage_log" | head -n 1 || true)
+  [[ -n $diagnostic ]] || diagnostic=$(tail -n 1 "$stage_log" | tr '\t\r\n' '   ')
   write_receipt FAIL "${diagnostic:-exit_$status}"
   cat "$receipt" >&2
   exit "$status"
@@ -69,7 +71,8 @@ fail_receipt() {
 trap fail_receipt ERR
 
 run_stage() {
-  "$@" 2>&1 | tee -a "$log"
+  : > "$stage_log"
+  "$@" 2>&1 | tee -a "$log" "$stage_log"
 }
 
 current_stage=compiler_build
