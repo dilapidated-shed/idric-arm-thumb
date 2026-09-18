@@ -86,7 +86,7 @@ run_stage make -C "$idric_support_root" install-api IDRIS2_BOOT="$compiler"
 passed="$passed compiler_api_install"
 
 current_stage=backend_build
-run_stage make -C "$repo_root" check driver IDRIC="$compiler" IDRIC_REPO="$idric_repo" IDRIC_COMPILER_REF="$compiler_ref"
+run_stage make -C "$repo_root" preflight IDRIC="$compiler" IDRIC_REPO="$idric_repo" IDRIC_COMPILER_REF="$compiler_ref"
 passed="$passed backend_build"
 
 current_stage=wegert_direct_dex
