@@ -55,10 +55,14 @@ cp "$unsigned" "$unaligned"
 zip -q -j "$unaligned" "$classes_dex"
 (
   cd "$payload"
-  zip -q -r "$unaligned" lib assets
+  # Android packages that request extractNativeLibs=false must keep native
+  # libraries uncompressed so the loader can mmap them directly from the APK.
+  zip -q -0 -r "$unaligned" lib
+  zip -q -r "$unaligned" assets
 )
 
-"$zipalign" -f -p 4 "$unaligned" "$aligned"
+# Align uncompressed native libraries for both 4 KiB and 16 KiB page devices.
+"$zipalign" -P 16 -f 4 "$unaligned" "$aligned"
 keytool -genkeypair -noprompt \
   -keystore "$keystore" \
   -storepass android \
@@ -75,13 +79,21 @@ keytool -genkeypair -noprompt \
   --out "$output" \
   "$aligned"
 "$apksigner" verify --verbose "$output"
+"$zipalign" -c -P 16 -v 4 "$output" >/dev/null
 
-unzip -l "$output" > "$work/files.txt"
+unzip -lv "$output" > "$work/files.txt"
 grep -Eq '[[:space:]]classes\.dex$' "$work/files.txt"
 grep -Eq '[[:space:]]lib/x86_64/.+\.so$' "$work/files.txt"
 grep -Eq '[[:space:]]lib/arm64-v8a/.+\.so$' "$work/files.txt"
 grep -Eq '[[:space:]]lib/armeabi-v7a/.+\.so$' "$work/files.txt"
 grep -Eq '[[:space:]]assets/.+' "$work/files.txt"
+awk '
+  $8 ~ /^lib\/.+\.so$/ && $2 != "Stored" {
+    print "compressed native library: " $8 > "/dev/stderr"
+    bad = 1
+  }
+  END { exit bad }
+' "$work/files.txt"
 
 printf 'direct DEX APK          %s\n' "$output"
 printf 'direct classes SHA-256 %s\n' "$(sha256sum "$classes_dex" | cut -d' ' -f1)"
