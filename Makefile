@@ -26,7 +26,7 @@ DEX_ORACLE_DISASSEMBLY := build/exec/baksmali-oracle/Idric/Generated.smali
 DEX_MALFORMED_FILE := build/exec/malformed-magic.dex
 DEX_VALIDATION_RECEIPT := build/exec/dex-validation-receipt.txt
 
-.PHONY: branch-separation check-compiler check driver dex-fixture dex-encoder-selftest \
+.PHONY: branch-separation check-compiler check preflight driver dex-fixture dex-encoder-selftest \
 	dex-determinism dex-reject dex-header-validation dex-parser-validation \
 	dex-oracle-validation dex-malformed-test dex-test dex-device test verify clean
 
@@ -39,6 +39,8 @@ check-compiler:
 
 check: check-compiler
 	$(IDRIC) --typecheck backend.ipkg
+
+preflight: check driver
 
 driver: $(DRIVER)
 
