@@ -201,8 +201,7 @@ sudo chmod 0755 "$rootfs/usr/local/sbin/device-action-init"
 
 kernel_source="$rootfs/boot/vmlinuz-$kernel_release"
 initrd_source="$rootfs/boot/initrd.img-$kernel_release"
-dtb_source=$(sudo find "$rootfs/usr/lib/linux-image-$kernel_release" \
-    -type f -name 'vexpress-v2p-ca15-tc1.dtb' -print -quit 2>/dev/null || true)
+dtb_source="$rootfs/lib/firmware/$kernel_release/device-tree/vexpress-v2p-ca15-tc1.dtb"
 [ -f "$kernel_source" ] && [ -f "$initrd_source" ] && [ -n "$dtb_source" ] || {
     printf '%s\n' 'FAIL: Ubuntu armhf rootfs did not provide kernel/initrd/DTB' >&2
     exit 1
