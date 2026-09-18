@@ -176,6 +176,16 @@ lower_primitive :
   Either String LowerState
 lower_primitive destination operation arguments state =
   case (operation, arguments) of
+    (EQ StringType,
+      [Administrative_Normal_Form_Local_Variable left_variable,
+       Administrative_Normal_Form_Local_Variable right_variable]) => do
+      left <- lookup_register "Text equality left operand" left_variable state
+      right <- lookup_register "Text equality right operand" right_variable state
+      left_type <- lookup_value_type "Text equality left operand" left_variable state
+      right_type <- lookup_value_type "Text equality right operand" right_variable state
+      if left_type /= TextValue || right_type /= TextValue
+        then Left "Checked String equality received a non-Text DEX operand"
+        else Right (emit (TextEqual destination left right) state)
     (binary,
       [Administrative_Normal_Form_Local_Variable left_variable,
        Administrative_Normal_Form_Local_Variable right_variable]) => do
@@ -195,11 +205,11 @@ lower_primitive destination operation arguments state =
               Right (lower_comparison accepted destination left right state)
             Nothing =>
               Left
-                ("Unsupported checked primitive in DEX Int32 subset: " ++
+                ("Unsupported checked primitive in DEX Int32/Text subset: " ++
                  show operation)
     _ =>
       Left
-        ("DEX Int32 primitive operands must be two ANF locals, got " ++
+        ("DEX checked primitive operands must be two ANF locals, got " ++
          show operation)
 
 private
@@ -213,14 +223,16 @@ infer_value_type (Administrative_Normal_Form_Primitive_Value _ (I32 _)) state =
 infer_value_type (Administrative_Normal_Form_Primitive_Value _ (Str _)) state =
   Right TextValue
 infer_value_type
+  (Administrative_Normal_Form_Primitive_Operation _ _ (EQ StringType) arguments) state =
+  Right IntegerValue
+infer_value_type
   (Administrative_Normal_Form_Primitive_Operation _ _ operation [_, _]) state =
   case integer_binary operation of
     Just _ => Right IntegerValue
     Nothing =>
       case integer_condition operation of
         Just _ => Right IntegerValue
-        Nothing =>
-          Left ("Cannot infer DEX value type for primitive " ++ show operation)
+        Nothing => Left ("Cannot infer DEX value type for primitive " ++ show operation)
 infer_value_type
   (Administrative_Normal_Form_Primitive_Operation _ _ operation arguments) state =
   Left ("Cannot infer DEX value type for primitive " ++ show operation)
@@ -254,7 +266,9 @@ mutual
             (emit
               (case destination_type of
                  IntegerValue => Move destination source
-                 TextValue => MoveObject destination source)
+                 BooleanValue => Move destination source
+                 TextValue => MoveObject destination source
+                 ObjectValue => MoveObject destination source)
               state)
   lower_to destination IntegerValue
     (Administrative_Normal_Form_Primitive_Value _ (I32 value)) state =
@@ -421,7 +435,9 @@ finish_method result_type body state = do
   let final_instruction =
         case result_type of
           IntegerValue => ReturnInteger lowered.result_register
+          BooleanValue => ReturnInteger lowered.result_register
           TextValue => ReturnObject lowered.result_register
+          ObjectValue => ReturnObject lowered.result_register
   Right (reverse (final_instruction :: lowered.instructions_reversed))
 
 private
