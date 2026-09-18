@@ -157,6 +157,14 @@ is_checked_int32_less actual resolved_expected =
     _ => False
 
 private
+is_checked_equal : Name -> Bool
+is_checked_equal actual =
+  show actual == "Prelude.EqOrd.==" ||
+  case actual of
+    DN "Prelude.EqOrd.==" _ => True
+    _ => False
+
+private
 lower_comparison :
   IntegerCondition -> Register -> Register -> Register -> LowerState -> LowerState
 lower_comparison condition destination left right state =
@@ -237,10 +245,13 @@ infer_value_type
   (Administrative_Normal_Form_Primitive_Operation _ _ operation arguments) state =
   Left ("Cannot infer DEX value type for primitive " ++ show operation)
 infer_value_type
-  (Administrative_Normal_Form_Named_Function_Application _ _ name _) state =
-  if is_checked_int32_less name state.integer_less_name
+  (Administrative_Normal_Form_Named_Function_Application _ _ name [_, _]) state =
+  if is_checked_int32_less name state.integer_less_name || is_checked_equal name
     then Right IntegerValue
     else Left ("Cannot infer DEX value type for checked call " ++ show name)
+infer_value_type
+  (Administrative_Normal_Form_Named_Function_Application _ _ name _) state =
+  Left ("Cannot infer DEX value type for checked call " ++ show name)
 infer_value_type expression state =
   Left ("Cannot infer DEX value type for checked ANF: " ++ show expression)
 
@@ -293,9 +304,18 @@ mutual
           left <- lookup_register "Int32 < left operand" left_variable state
           right <- lookup_register "Int32 < right operand" right_variable state
           Right (lower_comparison LessThanInteger destination left right state)
-        else
-          Left
-            ("Unsupported checked named call in DEX checked slice: " ++ show name)
+        else if is_checked_equal name
+          then do
+            left <- lookup_register "Text equality left operand" left_variable state
+            right <- lookup_register "Text equality right operand" right_variable state
+            left_type <- lookup_value_type "Text equality left operand" left_variable state
+            right_type <- lookup_value_type "Text equality right operand" right_variable state
+            if left_type /= TextValue || right_type /= TextValue
+              then Left "Checked == is outside the DEX Text equality slice"
+              else Right (emit (TextEqual destination left right) state)
+          else
+            Left
+              ("Unsupported checked named call in DEX checked slice: " ++ show name)
   lower_to destination destination_type
     (Administrative_Normal_Form_Binding _ nested_destination value body) state = do
       target <- lookup_register "Let destination" nested_destination state
