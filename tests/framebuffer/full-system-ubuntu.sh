@@ -56,6 +56,12 @@ kernel_release=$(sudo sh -c "ls -1 '$rootfs/lib/modules' | sort | tail -n 1")
     printf '%s\n' 'FAIL: Ubuntu armhf rootfs has no installed kernel modules' >&2
     exit 1
 }
+kernel_config="$rootfs/boot/config-$kernel_release"
+[ -f "$kernel_config" ] || {
+    printf 'FAIL: guest kernel config is missing: %s\n' "$kernel_config" >&2
+    exit 1
+}
+
 printf '%s\n' 'MODULES=list' | sudo tee "$rootfs/etc/initramfs-tools/conf.d/idric-device-oracle" >/dev/null
 modules_file="$rootfs/etc/initramfs-tools/modules"
 require_boot_module() {
@@ -63,7 +69,7 @@ require_boot_module() {
     config=$2
     if sudo find "$rootfs/lib/modules/$kernel_release" -type f -name "$module.ko*" -print -quit | grep -q .; then
         printf '%s\n' "$module" | sudo tee -a "$modules_file" >/dev/null
-    elif sudo grep -q "^$config=y$" "$rootfs/boot/config-$kernel_release" 2>/dev/null; then
+    elif sudo grep -q "^$config=y$" "$kernel_config" 2>/dev/null; then
         :
     else
         printf 'FAIL: guest kernel lacks required boot support: %s / %s\n' "$module" "$config" >&2
@@ -74,6 +80,46 @@ require_boot_module armmmci CONFIG_MMC_ARMMMCI
 require_boot_module mmc_core CONFIG_MMC
 require_boot_module mmc_block CONFIG_MMC_BLOCK
 require_boot_module ext4 CONFIG_EXT4_FS
+
+require_builtin_config() {
+    config=$1
+    if ! sudo grep -q "^$config=y$" "$kernel_config"; then
+        printf 'FAIL: guest kernel lacks required built-in display support: %s=y\n' "$config" >&2
+        exit 1
+    fi
+    printf 'DISPLAY_CONFIG=%s=y\n' "$config"
+}
+
+display_modules="$rootfs/etc/idric-display-modules"
+sudo sh -c ": > '$display_modules'"
+require_display_component() {
+    module=$1
+    config=$2
+    if sudo grep -q "^$config=y$" "$kernel_config"; then
+        printf 'DISPLAY_COMPONENT=%s built-in (%s=y)\n' "$module" "$config"
+        return
+    fi
+    if ! sudo grep -q "^$config=m$" "$kernel_config"; then
+        printf 'FAIL: guest kernel lacks required display component: %s / %s\n' "$module" "$config" >&2
+        exit 1
+    fi
+    if ! sudo chroot "$rootfs" /sbin/modinfo -k "$kernel_release" "$module" >/dev/null 2>&1; then
+        printf 'FAIL: guest kernel declares %s=m but module %s is unavailable\n' "$config" "$module" >&2
+        exit 1
+    fi
+    printf '%s\n' "$module" | sudo tee -a "$display_modules" >/dev/null
+    printf 'DISPLAY_COMPONENT=%s module (%s=m)\n' "$module" "$config"
+}
+
+# The custom init below deliberately bypasses systemd/udev. Therefore the
+# vexpress display path must be cold-plugged explicitly: QEMU presents the
+# Versatile I2C bus and SII9022 bridge in front of the PL111 controller.
+require_builtin_config CONFIG_FB
+require_builtin_config CONFIG_DRM_FBDEV_EMULATION
+require_display_component i2c_versatile CONFIG_I2C_VERSATILE
+require_display_component sii902x CONFIG_DRM_SII902X
+require_display_component pl111_drm CONFIG_DRM_PL111
+
 sudo chroot "$rootfs" /usr/sbin/update-initramfs -u -k "$kernel_release"
 
 sudo tee "$rootfs/usr/local/sbin/device-action-init" >/dev/null <<'GUEST_INIT'
@@ -82,16 +128,33 @@ exec </dev/console >/dev/console 2>&1
 /bin/busybox mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
 /bin/busybox mount -t proc proc /proc 2>/dev/null || true
 /bin/busybox mount -t sysfs sysfs /sys 2>/dev/null || true
-for module in pl111 pl111_drm amba-clcd drm_kms_helper; do
-    /sbin/modprobe "$module" 2>/dev/null || true
-done
+while IFS= read -r module; do
+    [ -n "$module" ] || continue
+    echo "DISPLAY_MODULE_LOAD=$module"
+    if ! /sbin/modprobe "$module"; then
+        echo "DISPLAY_MODULE_STATUS=$module:FAIL"
+        echo 'FBDEV_PRESENT=0'
+        echo 'PROGRAM_STATUS=124'
+        /bin/busybox poweroff -f
+        /bin/busybox sleep 5
+        exit 124
+    fi
+    echo "DISPLAY_MODULE_STATUS=$module:OK"
+done </etc/idric-display-modules
+
 i=0
-while [ ! -e /dev/fb0 ] && [ "$i" -lt 20 ]; do
+while [ ! -c /dev/fb0 ] && [ "$i" -lt 20 ]; do
     /bin/busybox sleep 1
     i=$((i + 1))
 done
-if [ ! -e /dev/fb0 ]; then
+if [ ! -c /dev/fb0 ]; then
     echo 'FBDEV_PRESENT=0'
+    echo '--- /sys/class/drm ---'
+    /bin/busybox ls -l /sys/class/drm 2>/dev/null || true
+    echo '--- /sys/class/graphics ---'
+    /bin/busybox ls -l /sys/class/graphics 2>/dev/null || true
+    echo '--- loaded modules ---'
+    /bin/busybox cat /proc/modules 2>/dev/null || true
     echo 'PROGRAM_STATUS=125'
     /bin/busybox poweroff -f
     /bin/busybox sleep 5
