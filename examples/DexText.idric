@@ -3,16 +3,16 @@ module DexText
 %default total
 
 %export "dex:echo_text"
-echo_text : String -> String
+echo_text : Text → Text
 echo_text text = text
 
 %export "dex:icu_word"
-icu_word : String
+icu_word : Text
 icu_word = "icu"
 
 %export "dex:text_equal"
-text_equal : String -> String -> Int32
-text_equal left right = if left == right then 1 else 0
+text_equal : Text → Text → Int32
+text_equal left right = if left ≟ right then 1 else 0
 
 main : IO ()
 main = pure ()
