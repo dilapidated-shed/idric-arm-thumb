@@ -190,13 +190,13 @@ sudo mkfs.ext4 -q -d "$rootfs" "$disk"
 sudo chown "$(id -u):$(id -g)" "$disk"
 rm -f "$serial" "$monitor" "$screen"
 
+# This lane uses a serial-only custom init. Ubuntu enables deferred fbcon
+# takeover, so without nodefer fb0 can exist while the PL111 scanout is
+# still unprogrammed. Bind fbcon immediately to commit the real fbdev
+# mode before the native oracle writes the framebuffer.
 "$QEMU_SYSTEM_ARM" \
     -machine vexpress-a9 -cpu cortex-a9 -m 512M \
     -kernel "$kernel" -dtb "$dtb" -initrd "$initrd" \
-    # This lane uses a serial-only custom init.  Ubuntu enables deferred fbcon
-    # takeover, so without nodefer fb0 can exist while the PL111 scanout is
-    # still unprogrammed.  Bind fbcon immediately to commit the real fbdev
-    # mode before the native oracle writes the framebuffer.
     -append 'console=ttyAMA0,115200 root=/dev/mmcblk0 rw rootwait init=/usr/local/sbin/device-action-init panic=-1 fbcon=nodefer' \
     -drive "file=$disk,format=raw,if=sd" \
     -display none -serial "file:$serial" \
