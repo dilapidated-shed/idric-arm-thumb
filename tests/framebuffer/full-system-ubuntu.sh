@@ -116,6 +116,7 @@ require_display_component() {
 # Versatile I2C bus and SII9022 bridge in front of the PL111 controller.
 require_builtin_config CONFIG_FB
 require_builtin_config CONFIG_DRM_FBDEV_EMULATION
+require_builtin_config CONFIG_FRAMEBUFFER_CONSOLE
 require_display_component i2c_versatile CONFIG_I2C_VERSATILE
 require_display_component sii902x CONFIG_DRM_SII902X
 require_display_component pl111_drm CONFIG_DRM_PL111
@@ -192,7 +193,11 @@ rm -f "$serial" "$monitor" "$screen"
 "$QEMU_SYSTEM_ARM" \
     -machine vexpress-a9 -cpu cortex-a9 -m 512M \
     -kernel "$kernel" -dtb "$dtb" -initrd "$initrd" \
-    -append 'console=ttyAMA0,115200 root=/dev/mmcblk0 rw rootwait init=/usr/local/sbin/device-action-init panic=-1' \
+    # This lane uses a serial-only custom init.  Ubuntu enables deferred fbcon
+    # takeover, so without nodefer fb0 can exist while the PL111 scanout is
+    # still unprogrammed.  Bind fbcon immediately to commit the real fbdev
+    # mode before the native oracle writes the framebuffer.
+    -append 'console=ttyAMA0,115200 root=/dev/mmcblk0 rw rootwait init=/usr/local/sbin/device-action-init panic=-1 fbcon=nodefer' \
     -drive "file=$disk,format=raw,if=sd" \
     -display none -serial "file:$serial" \
     -monitor "unix:$monitor,server=on,wait=off" -no-reboot &
