@@ -1,0 +1,153 @@
+name: ICU direct DEX checked slice
+
+on:
+  pull_request:
+
+concurrency:
+  group: icu-dex-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ICU_REF: 6165731c69a22dc3dd191e0d83e5662fcb288262
+  IDRIC_NET_REF: 73acb20b4234f88fecb003af514137edb26a4703
+  IDRIC_COMPILER_REF: 9fb1a2ca26b7010310a62135d8ce33b7e0d985e5
+  COMPILER_CACHE_VERSION: v4
+
+jobs:
+  checked-icu-path:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out DEX backend
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check out exact Idriç compiler
+        uses: actions/checkout@v4
+        with:
+          repository: isomorphisms/Idric
+          ref: ${{ env.IDRIC_COMPILER_REF }}
+          path: Idric
+
+      - name: Check out exact ICU source
+        uses: actions/checkout@v4
+        with:
+          repository: dilapidated-shed/icu
+          ref: ${{ env.ICU_REF }}
+          path: fixture/icu
+
+      - name: Check out exact Idric-Net source
+        uses: actions/checkout@v4
+        with:
+          repository: isomorphisms/Idric-Net
+          ref: ${{ env.IDRIC_NET_REF }}
+          path: fixture/Idric-Net
+
+      - name: Install host build inputs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bash build-essential ca-certificates chezscheme curl \
+            default-jre-headless file libgmp-dev libssl-dev python3
+
+      - name: Restore exact compiler toolchain
+        id: compiler-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            Idric/_/.tools
+            Idric/_/build
+            ~/.idris2
+          key: idric-${{ env.COMPILER_CACHE_VERSION }}-${{ runner.os }}-24.04-${{ env.IDRIC_COMPILER_REF }}
+
+      - name: Build exact compiler and install compiler API
+        if: steps.compiler-cache.outputs.cache-hit != 'true'
+        run: |
+          Idric/_/edric bootstrap
+          compiler="$GITHUB_WORKSPACE/Idric/_/build/exec/idris2"
+          "$compiler" --version
+          make -C Idric/_/support/chez install IDRIS2_VERSION=0.8.0
+          make -C Idric/_ install-bootstrap-libs IDRIS2="$compiler"
+          make -C Idric/_ install-api IDRIS2_BOOT="$compiler"
+          test -s "$GITHUB_WORKSPACE/Idric/_/build/exec/idris2_app/idris2.so"
+          "$compiler" --version
+
+      - name: Save exact compiler toolchain
+        if: steps.compiler-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            Idric/_/.tools
+            Idric/_/build
+            ~/.idris2
+          key: idric-${{ env.COMPILER_CACHE_VERSION }}-${{ runner.os }}-24.04-${{ env.IDRIC_COMPILER_REF }}
+
+      - name: Verify exact compiler
+        run: |
+          compiler="$GITHUB_WORKSPACE/Idric/_/build/exec/idris2"
+          test -x "$compiler"
+          test -s "$GITHUB_WORKSPACE/Idric/_/build/exec/idris2_app/idris2.so"
+          test "$(git -C Idric rev-parse HEAD)" = "$IDRIC_COMPILER_REF"
+          "$compiler" --version
+
+      - name: Install exact Idric-Net package
+        run: |
+          compiler="$GITHUB_WORKSPACE/Idric/_/build/exec/idris2"
+          test "$(git -C fixture/Idric-Net rev-parse HEAD)" = "$IDRIC_NET_REF"
+          (cd fixture/Idric-Net && "$compiler" --install idric-net.ipkg)
+
+      - name: Build exact ICU command package
+        run: |
+          compiler="$GITHUB_WORKSPACE/Idric/_/build/exec/idris2"
+          test "$(git -C fixture/icu rev-parse HEAD)" = "$ICU_REF"
+          make -C fixture/icu IDRIC="$compiler"
+          test -x fixture/icu/build/exec/icu
+
+      - name: Build direct DEX producer
+        env:
+          IDRIC_REPO: ${{ github.workspace }}/Idric
+          IDRIC_COMPILER_REF: ${{ env.IDRIC_COMPILER_REF }}
+        run: |
+          compiler="$GITHUB_WORKSPACE/Idric/_/build/exec/idris2"
+          make check driver IDRIC="$compiler"
+
+      - name: Record exact checked-slice inputs
+        run: |
+          mkdir -p fixture/icu/build/exec
+          {
+            printf 'repository\tref\n'
+            printf 'isomorphisms/Idric\t%s\n' "$(git -C Idric rev-parse HEAD)"
+            printf 'isomorphisms/Idric-Net\t%s\n' "$(git -C fixture/Idric-Net rev-parse HEAD)"
+            printf 'dilapidated-shed/icu\t%s\n' "$(git -C fixture/icu rev-parse HEAD)"
+            printf 'isomorphisms/idric-arm-thumb\t%s\n' "$(git rev-parse HEAD)"
+          } > fixture/icu/build/exec/icu-classes.inputs.tsv
+
+      - name: Compile exact ICU checked command path to direct DEX
+        run: |
+          (
+            cd fixture/icu
+            IDRIS2_PATH="$GITHUB_WORKSPACE/build/ttc:${IDRIS2_PATH:-}" \
+              "$GITHUB_WORKSPACE/build/exec/idric-dex" \
+              --cg dex -p idric_net --source-dir src src/Main.idric \
+              -o icu-classes
+            test -s build/exec/icu-classes.compiler.anf
+            test -s build/exec/icu-classes.compiler.vm
+            test -s build/exec/icu-classes.checked.anf
+            test -s build/exec/icu-classes.dex.plan
+            test -s build/exec/icu-classes.dex
+          )
+
+      - name: Retain checked ICU DEX evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: icu-direct-dex-checked-slice
+          path: |
+            fixture/icu/build/exec/icu-classes.inputs.tsv
+            fixture/icu/build/exec/icu-classes.dex
+            fixture/icu/build/exec/icu-classes.compiler.anf
+            fixture/icu/build/exec/icu-classes.compiler.vm
+            fixture/icu/build/exec/icu-classes.checked.anf
+            fixture/icu/build/exec/icu-classes.dex.plan
+            fixture/icu/build/exec/icu-classes.smali
+          if-no-files-found: warn
