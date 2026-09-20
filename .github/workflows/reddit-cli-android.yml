@@ -150,6 +150,11 @@ jobs:
             build/release/phone/libreddit_cli.so
           cp build/exec/reddit/libreddit_cli-arm64-v8a.so \
             build/release/tablet/libreddit_cli.so
+          chmod 0444 \
+            build/release/phone/libreddit_cli.so \
+            build/release/tablet/libreddit_cli.so
+          test "$(stat -c '%a' build/release/phone/libreddit_cli.so)" = 444
+          test "$(stat -c '%a' build/release/tablet/libreddit_cli.so)" = 444
           cp build/exec/reddit/host-receipt.txt build/release/phone/
           cp build/exec/reddit/host-receipt.txt build/release/tablet/
           printf 'target=phone\nabi=armeabi-v7a\nbackend_sha=%s\nworkflow_run=%s\ndex_read_only=yes\n' \
