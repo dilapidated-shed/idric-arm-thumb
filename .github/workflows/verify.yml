@@ -29,7 +29,10 @@ jobs:
           sudo apt-get install -y build-essential curl ca-certificates clang lld file libgmp-dev qemu-user
 
       - name: Bootstrap pinned Idriç
-        run: ./Idric/edric bootstrap
+        run: |
+          ./Idric/edric bootstrap
+          test -x "$GITHUB_WORKSPACE/Idric/.tools/bin/scheme"
+          echo "$GITHUB_WORKSPACE/Idric/.tools/bin" >> "$GITHUB_PATH"
 
       - name: Install pinned Idriç support, libraries and compiler API
         run: |
