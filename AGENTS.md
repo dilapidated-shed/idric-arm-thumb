@@ -3,26 +3,33 @@
 Apply the shared evidence and acceptance guardrails in
 `isomorphisms/ai-ci/AGENTS.md`.
 
-## Keep this repository ARM/Thumb-specific
+## Keep the current DEX line independent
 
-This repository owns the ARM/Thumb backend. Do not stack DEX/ART, JNI launcher,
-or application-specific Android work onto an ARM/Thumb branch merely because an
-existing ARM branch already has useful CI or compiler plumbing.
+Despite the historical repository name, current `main` owns the direct DEX
+backend. The ARM/Thumb development line is separate history. Do not route DEX
+lowering, encoding, packaging, or acceptance through ARM/Thumb implementation
+layers merely because this repository once carried ARM work.
 
-ARM/QEMU acceptance is not DEX/ART acceptance, and a DEX branch inheriting ARM
-history does not make the two backends one architecture. Put a distinct backend
-on its own repository/branch boundary unless the current architecture explicitly
-integrates them.
+ARM/QEMU acceptance is not DEX/ART acceptance. DEX/ART, JNI launchers, and
+application-specific Android adapters must also remain distinct layers:
+application adapters may consume direct DEX output without defining the generic
+DEX compiler interface.
 
-## Prove the native backend being claimed
+Run `tests/dex/branch-separation.sh` for source, package, Makefile, or workflow
+changes. It rejects tracked ARM implementation paths, ARM/Thumb imports or build
+dependencies anywhere in the DEX sources, ARM development ancestry, and leakage
+of application adapters into the generic DEX package.
 
-An ARM/Thumb backend claim must bind the exact Idriç/compiler contract to the
-exact backend head and inspect or execute the ARM/Thumb artifact required by the
-task.
+## Prove the DEX backend being claimed
 
-Generated C, RefC, a host implementation, a JNI shell, a simulator for another
-ISA, or a handwritten equivalent may be useful as an oracle or bootstrap, but
-it is not native ARM/Thumb backend evidence when the native path is the claim.
+A DEX backend claim must bind the exact Idriç/compiler contract to the exact
+backend head and inspect or execute the DEX artifact required by the task.
+
+Generated C, RefC, an ARM artifact, a JNI shell, or a handwritten Smali
+equivalent may be useful as an oracle or bootstrap, but it is not
+compiler-generated direct DEX evidence when the direct DEX path is the claim.
+Host parsing/validation, Android emulator execution, and physical phone/tablet
+execution remain separate evidence classes.
 
 Temporary application harnesses must remain replaceable and must not define the
 generic backend interface merely because they were the first executable path.
