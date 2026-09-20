@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+repo_root=${DEX_REPO_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)}
 cd "$repo_root"
 
 fail() {
@@ -18,6 +18,11 @@ if grep -Eiq 'Backend\.ARMThumb|qemu|arm-linux|thumb' \
     backend.ipkg Makefile src/Backend/DEX/Main.idr \
     .github/workflows/dex-verify.yml; then
   fail 'DEX build or CI still names an ARM/Thumb dependency'
+fi
+
+if grep -REiq '^[[:space:]]*import[[:space:]]+Backend\.ARMThumb' \
+    src/Backend/DEX; then
+  fail 'DEX source imports an ARM/Thumb implementation layer'
 fi
 
 grep -qx 'package idric_dex' backend.ipkg ||

@@ -38,6 +38,7 @@ DEX_VALIDATION_RECEIPT := build/exec/dex-validation-receipt.txt
 	dex-malformed-test dex-test dex-device test verify clean
 
 branch-separation:
+	tests/dex/branch-separation-self-test.sh
 	tests/dex/branch-separation.sh
 
 check-compiler:
