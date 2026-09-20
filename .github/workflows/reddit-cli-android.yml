@@ -158,6 +158,20 @@ jobs:
           printf 'target=tablet\nabi=arm64-v8a\nbackend_sha=%s\nworkflow_run=%s\ndex_read_only=yes\n' \
             "$BACKEND_SHA" "$GITHUB_RUN_ID" \
             >build/release/tablet/android-receipt.txt
+          printf 'target\tphone\nabi\tarmeabi-v7a\nsource_ref\t%s\npackage_ref\t%s\n' \
+            "$BACKEND_SHA" "$BACKEND_SHA" \
+            >build/release/phone/catfood-package.tsv
+          printf 'target\ttablet\nabi\tarm64-v8a\nsource_ref\t%s\npackage_ref\t%s\n' \
+            "$BACKEND_SHA" "$BACKEND_SHA" \
+            >build/release/tablet/catfood-package.tsv
+          grep -Fqx "target	phone" build/release/phone/catfood-package.tsv
+          grep -Fqx "abi	armeabi-v7a" build/release/phone/catfood-package.tsv
+          grep -Fqx "source_ref	$BACKEND_SHA" build/release/phone/catfood-package.tsv
+          grep -Fqx "package_ref	$BACKEND_SHA" build/release/phone/catfood-package.tsv
+          grep -Fqx "target	tablet" build/release/tablet/catfood-package.tsv
+          grep -Fqx "abi	arm64-v8a" build/release/tablet/catfood-package.tsv
+          grep -Fqx "source_ref	$BACKEND_SHA" build/release/tablet/catfood-package.tsv
+          grep -Fqx "package_ref	$BACKEND_SHA" build/release/tablet/catfood-package.tsv
           tar -C build/release/phone -czf build/release/reddit-phone.tar.gz .
           tar -C build/release/tablet -czf build/release/reddit-tablet.tar.gz .
           tar -tzvf build/release/reddit-phone.tar.gz | grep -Eq '^[-]r--r--r-- .*\./classes.dex$'
