@@ -31,9 +31,10 @@ jobs:
       - name: Bootstrap pinned Idriç
         run: ./Idric/edric bootstrap
 
-      - name: Install pinned Idriç libraries and compiler API
+      - name: Install pinned Idriç libraries, support, and compiler API
         run: |
           make -C Idric install-bootstrap-libs IDRIS2="$GITHUB_WORKSPACE/Idric/build/exec/idris2"
+          make -C Idric install-support
           make -C Idric install-api IDRIS2_BOOT="$GITHUB_WORKSPACE/Idric/build/exec/idris2"
 
       - name: Compile, inspect, assemble, and execute Thumb verification
