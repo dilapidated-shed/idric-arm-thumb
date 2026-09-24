@@ -74,6 +74,77 @@ The semantic question should stay above the lowering question. A cheap exponent
 comparison may implement "same rough scale" on one format; that does not require
 the user-facing concept to be "compare exponent bits."
 
+
+## Embedded scalar follower targets
+
+The scalar arithmetic and the backend scaffolding should be treated as two
+different questions.
+
+Once a format's value semantics are fixed, its basic scalar implementation is
+mostly shifts, masks, integer add/subtract, comparisons, and branches. That
+makes the arithmetic portable across many small ISAs. It does **not** mean the
+backend scaffolding, ABI choices, multi-byte operations, or acceptance coverage
+are equally mature on those targets.
+
+The existing `isomorphisms/idric-embedded` target branches give us concrete
+follower directions:
+
+| target family | embedded branch | note for low-precision scalar work |
+| --- | --- | --- |
+| RP2040 / Cortex-M0+ Thumb | `rp2040` | Closest follower to the ARM Thumb reference work. Reuse semantics, but keep the RP2040 backend contract separate. |
+| ESP RISC-V / ESP Xtensa | `esp` | Both are plausible scalar targets, but RISC-V and Xtensa are different lowerings. Pin the actual chip/ISA before making instruction-level claims. |
+| MSP430 / MSP430X | `msp430` | A 16-bit working value is a natural fit for values wider than one byte, including 9-bit E5M3. |
+| AVR / ATmega | `atmega` | 8-bit scalar storage is natural for the 8-bit formats; 9-bit E5M3 needs a wider or multi-byte working representation. |
+| AVR / ATtiny | `attiny` | Same width issue as ATmega, with tighter machine constraints making the lowering more revealing. |
+| CH552 / 8051 | `ch552` | Scalar arithmetic remains feasible, but multi-byte work and backend plumbing are more tedious. Treat this as a constrained-case test, not a claim of equal maturity. |
+| Game Boy SM83 | `game-boy` | Another useful constrained 8-bit case. Keep semantics common while allowing very different register/memory lowering. |
+| TriCore / AURIX | `tricore-aurix` | Plausible follower once the exact TriCore generation/subtarget is pinned; do not write lowering assumptions against an unspecified AURIX core. |
+
+These branches should remain architecture-specific evidence. Portability of the
+arithmetic is not a reason to collapse their distinct backend work.
+
+### Keep three widths separate
+
+For these scalar formats, do not silently identify:
+
+1. **logical payload width** -- the bits required by the format itself;
+2. **storage width** -- how the value is laid out in memory or an ABI slot; and
+3. **working width** -- the integer/register width used while decoding,
+   normalizing, comparing, or doing arithmetic.
+
+For the current six-format line, the nominal payload widths are:
+
+| format | nominal payload width |
+| --- | ---: |
+| E3M2 | 6 bits |
+| E4M3 | 8 bits |
+| E5M2 | 8 bits |
+| E5M3 | 9 bits |
+| Bits8 | 8 bits |
+| Float16 | 16 bits |
+
+Those widths do not by themselves choose packing or ABI layout. In particular,
+E5M3 crossing the one-byte boundary is exactly the sort of case that should make
+the backend's widening and multi-byte policy explicit rather than hidden inside
+generic scalar code.
+
+### Follower acceptance
+
+A follower backend should prove the shared semantics before it is called an
+implementation. At minimum, keep acceptance around:
+
+- encode/decode round trips and the format's special-value policy;
+- comparison and sign/scale behavior;
+- conversion to and from the backend's chosen working representation;
+- arithmetic against the same reference semantics used by ARM Thumb;
+- byte order and multi-byte behavior where storage or working values cross an
+  8-bit boundary.
+
+The ARM Thumb implementation remains the reference line. The embedded targets
+are followers used to discover where the allegedly portable scalar semantics
+still leak assumptions about register width, carry/borrow, normalization,
+packing, or ABI shape.
+
 ## Sources
 
 - AMD EPYC 9555 product page: 12 DDR5 channels, up to 6400 MT/s, 614 GB/s per
