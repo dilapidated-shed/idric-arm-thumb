@@ -46,16 +46,28 @@ def main() -> int:
     if run.returncode != 0:
         sys.stderr.write(run.stderr.decode("utf-8", "replace"))
         raise SystemExit(f"observer executable exited {run.returncode}")
-    if len(run.stdout) != 12:
-        raise SystemExit(f"observer emitted {len(run.stdout)} bytes, expected 12")
+    if len(run.stdout) != 24:
+        raise SystemExit(f"observer emitted {len(run.stdout)} bytes, expected 24")
 
     theta = math.radians(360.0 / 17.4)
     caster_multiplier = 1.0 / (2.0 * math.sin(theta))
 
-    front = 1.0
-    rear = -0.5
-    jacobian_camber = -1.3 * front + -0.7 * rear
-    jacobian_caster = -1.0 * front + 1.0 * rear
+    jacobian_rows = [
+        ("driver.camber[0]", 0.5451388472381876),
+        ("driver.camber[1]", 0.5927113334029114),
+        ("driver.camber[2]", 0.4895670078008919),
+        ("driver.camber[3]", 0.5289665323810473),
+        ("driver.camber[4]", 0.45372048698916667),
+        ("driver.camber[5]", 0.4731549501099014),
+        ("driver.camber[6]", 0.42261242702714896),
+        ("passenger.camber[0]", -0.15357695334574295),
+        ("passenger.camber[1]", -0.08165240496535331),
+        ("passenger.camber[2]", -0.05029350042927705),
+        ("passenger.camber[3]", 0.018128930745486826),
+        ("passenger.camber[4]", -0.0026210159607702455),
+        ("passenger.camber[5]", 0.058420594931340275),
+        ("passenger.camber[6]", -0.046822717143564785),
+    ]
 
     x = 3.0
     y = 4.0
@@ -70,8 +82,7 @@ def main() -> int:
         ("power 1.5^2", 1.5 ** 2),
         ("power 1.5^3", 1.5 ** 3),
         ("sqrt 2", math.sqrt(2.0)),
-        ("Jacobian delta camber", jacobian_camber),
-        ("Jacobian delta caster", jacobian_caster),
+    ] + [("Jv " + name, value) for name, value in jacobian_rows] + [
         ("rotate (3,4) x", rotated_x),
         ("rotate (3,4) y", rotated_y),
         ("caster from 4-degree swing", 4.0 * caster_multiplier),
@@ -91,8 +102,13 @@ def main() -> int:
               f"{dyadic(observed):>12} {reference_text(residue):>12}")
 
     print()
-    print("Physical inputs before E3M2 quantization:")
-    print("  adjustment Jacobian = [[-1.3, -0.7], [-1, 1]], vector = [1, -0.5]")
+    print("Dakota 14x26 Jacobian exercise:")
+    print("  rows: 14 camber observations; columns: 26 named state/nuisance coordinates")
+    print("  all 364 partial derivatives are quantized to E3M2 before the matrix product")
+    print("  278/364 quantized Jacobian entries are zero at this scale")
+    print("  direction: coefficients/geometry/calibration use exact quarters/halves;")
+    print("             all 14 steering-offset coordinates use alternating +/-1/16 rad")
+    print("  each multiply and each accumulation is requantized to E3M2")
     print("  rotation vector = [3, 4]")
     print("  E3M2 rotation coefficients actually executed: cos=7/8, sin=3/8")
     print("  E3M2 caster multiplier actually executed: 3/2")

@@ -21,8 +21,13 @@ prints the reference value, observed E3M2 value, and numerical residue
 (`observed - reference`). The numerical residue is deliberately not a pass/fail
 criterion.
 
-The cases include add/subtract/multiply/divide, square, cube, square root, a
-2-by-2 Dodge Dakota camber/caster adjustment Jacobian, a planar rotation using
+The cases include add/subtract/multiply/divide, square, cube, square root, the recovered 14-by-26 Dakota sweep measurement-model Jacobian, a planar rotation using
 the same steering-ratio angle as the caster work, and the two-position caster
 multiplier. The runner only fails if the program cannot execute or does not emit
 the expected number of observation payloads.
+
+
+The Jacobian observation deliberately quantizes all 364 named partial
+derivatives before executing a 14-by-26 matrix-vector product. At the current
+E3M2 scale, 278 of the 364 matrix entries become zero; that loss is reported as
+part of the measurement rather than treated as a test failure.
