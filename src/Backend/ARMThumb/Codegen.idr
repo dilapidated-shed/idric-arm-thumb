@@ -40,14 +40,25 @@ print_ascii_main_name =
 private
 classify_abi_type : Term variables -> Either String Representation
 classify_abi_type (PrimVal _ (PrT Int32Type)) = Right Word32
+classify_abi_type (PrimVal _ (PrT Bits8Type)) = Right Bits8Value
 classify_abi_type (PrimVal _ (PrT primitive_type)) =
   Left ("unsupported source primitive type `" ++ show primitive_type ++ "`")
 classify_abi_type (Ref _ (TyCon 0) name) =
   if name == renderer_type_name "Float32"
     then Right Float32
-    else if name == renderer_type_name "Float32Buffer"
-      then Right Float32Pointer
-      else Left ("unsupported source type `" ++ show name ++ "`")
+  else if name == renderer_type_name "Float16"
+    then Right Float16Value
+  else if name == renderer_type_name "E4M3"
+    then Right E4M3Value
+  else if name == renderer_type_name "E5M2"
+    then Right E5M2Value
+  else if name == renderer_type_name "E3M2"
+    then Right E3M2Value
+  else if name == renderer_type_name "E5M3"
+    then Right E5M3Value
+  else if name == renderer_type_name "Float32Buffer"
+    then Right Float32Pointer
+  else Left ("unsupported source type `" ++ show name ++ "`")
 classify_abi_type type = Left "unsupported source type"
 
 private
@@ -73,6 +84,17 @@ parse_source_signature result_type = do
   Right ([], result_representation)
 
 private
+is_scalar_result : Representation -> Bool
+is_scalar_result Float32 = True
+is_scalar_result Bits8Value = True
+is_scalar_result Float16Value = True
+is_scalar_result E4M3Value = True
+is_scalar_result E5M2Value = True
+is_scalar_result E3M2Value = True
+is_scalar_result E5M3Value = True
+is_scalar_result _ = False
+
+private
 resolve_export_abi :
   {auto c : Ref Ctxt Defs} -> (Name, String) -> Core ExportABI
 resolve_export_abi (internal_name, external_symbol) = do
@@ -93,16 +115,16 @@ resolve_export_abi (internal_name, external_symbol) = do
         (UserError
           ("arm-thumb rejected source ABI for `" ++ show internal_name ++
            "`: " ++ explanation ++
-           ". Supported arguments are RendererPrimitives.Float32, " ++
-           "RendererPrimitives.Float32Buffer, and Int32; the result must " ++
-           "be RendererPrimitives.Float32."))
+           ". Supported arguments are Float32, Float16, E4M3, E5M2, E3M2, " ++
+           "E5M3, Bits8, Float32Buffer, and Int32; the result must be a " ++
+           "supported scalar value."))
     Right (arguments, result) =>
-      if result /= Float32
+      if not (is_scalar_result result)
         then
           throw
             (UserError
               ("arm-thumb rejected source ABI for `" ++ show internal_name ++
-               "`: result must be RendererPrimitives.Float32, not " ++
+               "`: result must be a supported scalar value, not " ++
                show result ++ "."))
         else if length arguments > 4
           then
