@@ -95,8 +95,10 @@ numeric primitive. This is research, not a change to the accepted Armv7-A
 backend contract.
 
 
-## Compact arithmetic
+## Compact arithmetic experiment
 
-Low-precision values keep their compact stored representation across operation
-boundaries while using wider temporary computation where useful. See
-[`notes/compact-storage-wider-computation.md`](notes/compact-storage-wider-computation.md).
+The current E3M2 path is being measured as-is. A possible later experiment with
+wider temporary computational headroom is deliberately deferred; it is not the
+selected policy. See
+[`notes/compact-storage-wider-computation.md`](notes/compact-storage-wider-computation.md)
+and issue #98.
