@@ -88,3 +88,44 @@ the user-facing concept to be "compare exponent bits."
 
 The current-container row is a direct observation from `lscpu` / `free` in
 the active KVM guest, not a claim about the hidden physical host.
+
+
+## Small rotations: plan the planes, keep antisymmetry structural
+
+For a small rotation in an active coordinate plane \((i,j)\), the register
+work can use the first-order update
+
+\[
+x_i' \approx x_i - \theta x_j, \qquad
+x_j' \approx x_j + \theta x_i.
+\]
+
+The higher-level planning/type layer should decide which coordinate planes are
+active and communicate one signed small rotation amount per plane. The backend
+should not materialize a dense high-dimensional rotation matrix when only a few
+planes need to move.
+
+For a complex representation of a selected 2-plane, antisymmetry is already
+structural:
+
+\[
+z = x_i + i x_j, \qquad
+z' = e^{i\theta} z \approx (1 + i\theta)z.
+\]
+
+In polar form this is simply
+
+\[
+(r,\phi) \mapsto (r,\phi + \theta).
+\]
+
+Therefore do **not** separately encode equal-and-opposite coefficients such as
+\((-2,+2)\) for the two directions of one plane. Encode the plane plus one
+signed rotation amount; the opposite coupling is implied by the complex
+structure. Sparse signed amounts such as \(-2,-1,+1\) can belong to distinct
+active planes or planned rotation contributions, but each individual rotation
+plane retains this antisymmetric pairing.
+
+The linearized update is intentionally first-order. Norm error is second-order
+in the small angle, so repeated composition needs its own policy; that should
+not be confused with the representation of one small planned rotation.
