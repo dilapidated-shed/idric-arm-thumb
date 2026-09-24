@@ -163,8 +163,10 @@ MIRO A1's exact DRAM bus width or channel topology.
 
 Arm documents Cortex-A55 as configurable rather than one fixed cache machine.
 Published ranges include 8-64 KB L1 instruction/data caches, 64-256 KB private
-L2, and optional shared L3. Do not substitute a convenient generic A55
-configuration for measurements from the actual phone.
+L2, and optional shared L3. The Cortex-A55 data-side cache line is 64 bytes.
+That 64-byte allocation/fill unit is not the same thing as a 512-bit physical
+DRAM bus. Do not substitute a convenient generic A55 configuration for
+measurements from the actual phone.
 
 Sources:
 
