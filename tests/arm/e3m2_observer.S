@@ -90,7 +90,7 @@ _start:
         bl      e3m2_mul_test
         strb    r0, [r4, #23]
 
-        @ Emit raw E3M2 payloads. The host observer prints reference/observed/residue.
+        @ Emit raw E3M2 payloads. The host observer prints reference/observed/residual.
         movs    r0, #1
         mov     r1, r4
         movs    r2, #24
