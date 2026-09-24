@@ -140,9 +140,26 @@ argument_registers : List String
 argument_registers = ["r0", "r1", "r2", "r3"]
 
 private
+canonicalise_argument : String -> Representation -> List String
+canonicalise_argument register Bits8Value =
+  ["        uxtb    " ++ register ++ ", " ++ register]
+canonicalise_argument register Float16Value =
+  ["        uxth    " ++ register ++ ", " ++ register]
+canonicalise_argument register E4M3Value =
+  ["        uxtb    " ++ register ++ ", " ++ register]
+canonicalise_argument register E5M2Value =
+  ["        uxtb    " ++ register ++ ", " ++ register]
+canonicalise_argument register E3M2Value =
+  ["        and.w   " ++ register ++ ", " ++ register ++ ", #63"]
+canonicalise_argument register E5M3Value =
+  ["        uxtb    " ++ register ++ ", " ++ register]
+canonicalise_argument register _ = []
+
+private
 store_arguments : List Local -> List String -> List String
 store_arguments [] registers = []
 store_arguments (argument :: rest) (register :: registers) =
+  canonicalise_argument register argument.representation ++
   store_word register argument ++ store_arguments rest registers
 store_arguments arguments [] = []
 
