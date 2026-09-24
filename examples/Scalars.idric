@@ -180,5 +180,93 @@ e5m3_to_f32_test value = e5m3_to_float32 value
 f32_to_e5m3_test : Float32 -> E5M3
 f32_to_e5m3_test value = float32_to_e5m3 value
 
+
+%export "arm-thumb:e5m3_add_observe"
+e5m3_add_observe : E5M3 -> E5M3 -> Float32
+e5m3_add_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_add left_wide right_wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_sub_observe"
+e5m3_sub_observe : E5M3 -> E5M3 -> Float32
+e5m3_sub_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_subtract left_wide right_wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_mul_observe"
+e5m3_mul_observe : E5M3 -> E5M3 -> Float32
+e5m3_mul_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_multiply left_wide right_wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_div_observe"
+e5m3_div_observe : E5M3 -> E5M3 -> Float32
+e5m3_div_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_divide left_wide right_wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_square_observe"
+e5m3_square_observe : E5M3 -> Float32
+e5m3_square_observe value =
+  let wide = e5m3_to_float32 value
+      result = float32_multiply wide wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_cube_observe"
+e5m3_cube_observe : E5M3 -> Float32
+e5m3_cube_observe value =
+  let wide = e5m3_to_float32 value
+      square = float32_multiply wide wide
+      result = float32_multiply square wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_sqrt_observe"
+e5m3_sqrt_observe : E5M3 -> Float32
+e5m3_sqrt_observe value =
+  let wide = e5m3_to_float32 value
+      result = float32_square_root wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_rotate_x_observe"
+e5m3_rotate_x_observe : E5M3 -> E5M3 -> E5M3 -> E5M3 -> Float32
+e5m3_rotate_x_observe cosine sine x y =
+  let c = e5m3_to_float32 cosine
+      s = e5m3_to_float32 sine
+      x_wide = e5m3_to_float32 x
+      y_wide = e5m3_to_float32 y
+      cx = float32_multiply c x_wide
+      sy = float32_multiply s y_wide
+      result = float32_subtract cx sy
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_rotate_y_observe"
+e5m3_rotate_y_observe : E5M3 -> E5M3 -> E5M3 -> E5M3 -> Float32
+e5m3_rotate_y_observe sine cosine x y =
+  let s = e5m3_to_float32 sine
+      c = e5m3_to_float32 cosine
+      x_wide = e5m3_to_float32 x
+      y_wide = e5m3_to_float32 y
+      sx = float32_multiply s x_wide
+      cy = float32_multiply c y_wide
+      result = float32_add sx cy
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
 main : IO ()
 main = pure ()
