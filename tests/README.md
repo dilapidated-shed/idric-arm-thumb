@@ -12,3 +12,17 @@ The backend test suite is layered so failures point at the contract that broke.
 `tests/source/` contains acceptance-boundary fixtures. `tests/arm/backend_selftest.S` is the runtime oracle for generated code. Each semantic failure exits with a distinct nonzero code so the failing primitive or ABI case is identifiable.
 
 Exact Float32 checks currently include ordinary arithmetic, signed zero, exact fractional/negative results, buffer loads, identity/unused arguments, and the four-register one-word softfp argument boundary. NaN payload behavior is intentionally not asserted until that bit-level contract is specified.
+
+
+## E3M2 observational residue measurements
+
+`make e3m2-observe` executes E3M2 arithmetic in the generated Thumb program and
+prints the reference value, observed E3M2 value, and numerical residue
+(`observed - reference`). The numerical residue is deliberately not a pass/fail
+criterion.
+
+The cases include add/subtract/multiply/divide, square, cube, square root, a
+2-by-2 Dodge Dakota camber/caster adjustment Jacobian, a planar rotation using
+the same steering-ratio angle as the caster work, and the two-position caster
+multiplier. The runner only fails if the program cannot execute or does not emit
+the expected number of observation payloads.
