@@ -101,6 +101,92 @@ and should not appear in the ordinary `Circle` interface.
 For a binary BAM value, left shift happens to implement angle doubling modulo
 one turn. That is a different map from rigid rotation.
 
+## Sector-plus-binary representations
+
+A useful non-power-of-two family is
+
+```text
+Circle (q * 2^n)
+```
+
+where `q` is a small exact symmetry count and the remaining `n` bits give a
+binary position inside that sector.
+
+Conceptually the machine coordinate is
+
+```text
+(sector, position_within_sector)
+```
+
+with
+
+```text
+sector                 = 0 .. q-1
+position_within_sector = 0 .. 2^n-1
+```
+
+The packed unsigned code
+
+```text
+code = sector * 2^n + position_within_sector
+```
+
+already has this form in ordinary binary. If the container has more tag patterns
+than `q` needs, the remaining patterns are spare/noncanonical.
+
+This preserves an exact non-dyadic symmetry globally while retaining ordinary
+binary subdivision locally.
+
+### Circle 96 = 3 * 32
+
+`Circle96` fits in seven bits and naturally splits as
+
+```text
+00xxxxx   first third
+01xxxxx   second third
+10xxxxx   third third
+11xxxxx   spare / noncanonical
+```
+
+so the three third-turn landmarks are visually immediate:
+
+```text
+0000000     0 degrees
+0100000   120 degrees
+1000000   240 degrees
+```
+
+Halfway through each third gives the sixth-turn landmarks:
+
+```text
+0010000    60 degrees
+0110000   180 degrees
+1010000   300 degrees
+```
+
+Thus the factor of three is carried by the sector tag while the five low bits
+retain exact repeated binary subdivision within each third.
+
+The representation does not require the source language to expose the pair as
+two ordinary integers. `Circle96` remains one geometric circle type; the
+factorization is a useful machine view and a source of exact named rotations.
+
+### Fifth sectors
+
+The same construction works for five-fold symmetry:
+
+```text
+Circle (5 * 2^n)
+```
+
+A packed representation needs enough high tag patterns to name sectors
+0 through 4; the remaining tag patterns can be spare. The low `n` bits still
+give exact halves, quarters, eighths, and so on inside each fifth.
+
+This gives exact fifth-turn landmarks without giving up binary refinement
+inside each fifth. It is useful for regular-pentagon geometry and the associated
+`sqrt(5)` / golden-ratio constructions.
+
 ## Useful finite circles
 
 There should not be one mandatory circle size. Choose a representation whose
