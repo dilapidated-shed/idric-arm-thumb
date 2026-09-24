@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+from fractions import Fraction
 import subprocess
 import sys
 
@@ -15,6 +16,25 @@ def e3m2_decode(payload: int) -> float:
     else:
         value = math.ldexp(1.0 + mantissa / 4.0, exponent - 3)
     return sign * value
+
+
+
+def dyadic(value: float) -> str:
+    fraction = Fraction(value).limit_denominator(16)
+    if float(fraction) != value:
+        return f"{value:.6f}"
+    if fraction.denominator == 1:
+        return str(fraction.numerator)
+    return f"{fraction.numerator}/{fraction.denominator}"
+
+
+def reference_text(value: float) -> str:
+    fraction = Fraction(value).limit_denominator(16)
+    if abs(float(fraction) - value) < 1e-12:
+        if fraction.denominator == 1:
+            return str(fraction.numerator)
+        return f"{fraction.numerator}/{fraction.denominator}"
+    return f"{value:.6f}"
 
 
 def main() -> int:
@@ -67,15 +87,15 @@ def main() -> int:
     for (label, reference), payload in zip(cases, run.stdout):
         observed = e3m2_decode(payload)
         residue = observed - reference
-        print(f"{label:31} 0x{payload:02x} {reference:12.6f} "
-              f"{observed:12.6f} {residue:12.6f}")
+        print(f"{label:31} 0x{payload:02x} {reference_text(reference):>12} "
+              f"{dyadic(observed):>12} {reference_text(residue):>12}")
 
     print()
     print("Physical inputs before E3M2 quantization:")
     print("  adjustment Jacobian = [[-1.3, -0.7], [-1, 1]], vector = [1, -0.5]")
     print("  rotation vector = [3, 4]")
-    print("  E3M2 rotation coefficients actually executed: cos=0.875, sin=0.375")
-    print("  E3M2 caster multiplier actually executed: 1.5")
+    print("  E3M2 rotation coefficients actually executed: cos=7/8, sin=3/8")
+    print("  E3M2 caster multiplier actually executed: 3/2")
     return 0
 
 
