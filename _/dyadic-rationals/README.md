@@ -30,6 +30,7 @@ Do not widen the whole floating pipeline merely to support this. Issue #83 alrea
 - [LEAN.md](LEAN.md) — Lean 4 core implements canonical dyadics, exact ring operations, shifts, conversion to rationals, rounding, and precision-bounded inversion/division.
 - [CONWAYHS.md](CONWAYHS.md) — ConwayHs implements arbitrary-precision dyadics as an integer numerator plus a power-of-two denominator exponent.
 - [MACHINE-REPRESENTATION.md](MACHINE-REPRESENTATION.md) — what these sources do and do not establish for an ARM machine representation.
+- [RESEARCH-PASS-2.md](RESEARCH-PASS-2.md) — broader exact-real literature: Coq, RZ, iRRAM, MPFR, dyadic streams, scaled integers, and arbitrary-radix certified arithmetic.
 - [mirror/](mirror/) — exact pinned upstream source where redistribution terms are clear.
 
 ## First ARM acceptance slice
