@@ -200,3 +200,10 @@ plane retains this antisymmetric pairing.
 The linearized update is intentionally first-order. Norm error is second-order
 in the small angle, so repeated composition needs its own policy; that should
 not be confused with the representation of one small planned rotation.
+
+
+## Fetch scheduling and timing follow-up
+
+The detailed 2026-09-24 notes on request batching, holding places, clock/timing
+semantics, phone measurement, and the stop condition for optimization are in
+[`fetch-batching-memory-timing.md`](fetch-batching-memory-timing.md).
