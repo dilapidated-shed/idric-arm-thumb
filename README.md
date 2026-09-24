@@ -82,3 +82,14 @@ The older `idris-arm-backend` remains useful reference code for the broader arit
 ## Next slice
 
 After this affine path is green: bring back the remaining proven Float32 operations and caller-owned `Float32Buffer` loads, then add comparisons and a constrained tail loop for Horner evaluation.
+
+## Cortex-A55 side research
+
+The `notes/cortex-a55-carry-path` line also records a deliberately separate
+architecture/microarchitecture investigation. [Cortex-A55 low-precision floating
+point: ISA versus datapath](notes/cortex-a55-low-precision-floating-point.md)
+distinguishes Armv7-A half-precision storage/conversion from Armv8.2-A native
+FP16 arithmetic, maps the latter onto the public A55 FP/NEON pipeline and timing
+data, and records E4M3/E5M2 as existing candidates for a deliberately coarser
+numeric primitive. This is research, not a change to the accepted Armv7-A
+backend contract.
