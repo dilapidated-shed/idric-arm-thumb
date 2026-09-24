@@ -89,84 +89,50 @@ data RendererPrimitive
   | NarrowBinaryPrimitive NarrowFloatFormat NarrowBinaryOperation
 
 private
-narrow_binary_name :
-  NarrowFloatFormat -> String -> NarrowBinaryOperation -> Name -> Maybe RendererPrimitive
-narrow_binary_name format prefix operation name =
-  if name == renderer_name prefix
-    then Just (NarrowBinaryPrimitive format operation)
-    else Nothing
+lookup_renderer : Name -> List (Name, RendererPrimitive) -> Maybe RendererPrimitive
+lookup_renderer requested [] = Nothing
+lookup_renderer requested ((candidate, primitive) :: rest) =
+  if requested == candidate then Just primitive else lookup_renderer requested rest
 
 private
 renderer_primitive : Name -> Maybe RendererPrimitive
 renderer_primitive name =
-  if name == renderer_name "float32_buffer_load"
-    then Just BufferLoad
-  else if name == renderer_name "float32_add"
-    then Just (Binary AddFloat32)
-  else if name == renderer_name "float32_subtract"
-    then Just (Binary SubtractFloat32)
-  else if name == renderer_name "float32_multiply"
-    then Just (Binary MultiplyFloat32)
-  else if name == renderer_name "float32_divide"
-    then Just (Binary DivideFloat32)
-  else if name == renderer_name "float32_negate"
-    then Just (Unary NegateFloat32)
-  else if name == renderer_name "float32_absolute"
-    then Just (Unary AbsoluteFloat32)
-  else if name == renderer_name "float32_square_root"
-    then Just (Unary SquareRootFloat32)
-  else if name == renderer_name "float16_to_float32"
-    then Just (ToFloat32 Binary16)
-  else if name == renderer_name "float32_to_float16"
-    then Just (FromFloat32 Binary16)
-  else if name == renderer_name "e4m3_to_float32"
-    then Just (ToFloat32 FP8E4M3)
-  else if name == renderer_name "float32_to_e4m3"
-    then Just (FromFloat32 FP8E4M3)
-  else if name == renderer_name "e5m2_to_float32"
-    then Just (ToFloat32 FP8E5M2)
-  else if name == renderer_name "float32_to_e5m2"
-    then Just (FromFloat32 FP8E5M2)
-  else if name == renderer_name "e3m2_to_float32"
-    then Just (ToFloat32 FP6E3M2)
-  else if name == renderer_name "float32_to_e3m2"
-    then Just (FromFloat32 FP6E3M2)
-  else if name == renderer_name "e5m3_to_float32"
-    then Just (ToFloat32 OotomoE5M3)
-  else if name == renderer_name "float32_to_e5m3"
-    then Just (FromFloat32 OotomoE5M3)
-  else
-    case narrow_binary_name Binary16 "float16_add" AddNarrow name of
-      Just primitive => Just primitive
-      Nothing => case narrow_binary_name Binary16 "float16_subtract" SubtractNarrow name of
-        Just primitive => Just primitive
-        Nothing => case narrow_binary_name Binary16 "float16_multiply" MultiplyNarrow name of
-          Just primitive => Just primitive
-          Nothing => case narrow_binary_name Binary16 "float16_divide" DivideNarrow name of
-            Just primitive => Just primitive
-            Nothing => case narrow_binary_name FP8E4M3 "e4m3_add" AddNarrow name of
-              Just primitive => Just primitive
-              Nothing => case narrow_binary_name FP8E4M3 "e4m3_subtract" SubtractNarrow name of
-                Just primitive => Just primitive
-                Nothing => case narrow_binary_name FP8E4M3 "e4m3_multiply" MultiplyNarrow name of
-                  Just primitive => Just primitive
-                  Nothing => case narrow_binary_name FP8E4M3 "e4m3_divide" DivideNarrow name of
-                    Just primitive => Just primitive
-                    Nothing => case narrow_binary_name FP8E5M2 "e5m2_add" AddNarrow name of
-                      Just primitive => Just primitive
-                      Nothing => case narrow_binary_name FP8E5M2 "e5m2_subtract" SubtractNarrow name of
-                        Just primitive => Just primitive
-                        Nothing => case narrow_binary_name FP8E5M2 "e5m2_multiply" MultiplyNarrow name of
-                          Just primitive => Just primitive
-                          Nothing => case narrow_binary_name FP8E5M2 "e5m2_divide" DivideNarrow name of
-                            Just primitive => Just primitive
-                            Nothing => case narrow_binary_name FP6E3M2 "e3m2_add" AddNarrow name of
-                              Just primitive => Just primitive
-                              Nothing => case narrow_binary_name FP6E3M2 "e3m2_subtract" SubtractNarrow name of
-                                Just primitive => Just primitive
-                                Nothing => case narrow_binary_name FP6E3M2 "e3m2_multiply" MultiplyNarrow name of
-                                  Just primitive => Just primitive
-                                  Nothing => narrow_binary_name FP6E3M2 "e3m2_divide" DivideNarrow name
+  lookup_renderer name
+    [ (renderer_name "float32_buffer_load", BufferLoad)
+    , (renderer_name "float32_add", Binary AddFloat32)
+    , (renderer_name "float32_subtract", Binary SubtractFloat32)
+    , (renderer_name "float32_multiply", Binary MultiplyFloat32)
+    , (renderer_name "float32_divide", Binary DivideFloat32)
+    , (renderer_name "float32_negate", Unary NegateFloat32)
+    , (renderer_name "float32_absolute", Unary AbsoluteFloat32)
+    , (renderer_name "float32_square_root", Unary SquareRootFloat32)
+    , (renderer_name "float16_to_float32", ToFloat32 Binary16)
+    , (renderer_name "float32_to_float16", FromFloat32 Binary16)
+    , (renderer_name "e4m3_to_float32", ToFloat32 FP8E4M3)
+    , (renderer_name "float32_to_e4m3", FromFloat32 FP8E4M3)
+    , (renderer_name "e5m2_to_float32", ToFloat32 FP8E5M2)
+    , (renderer_name "float32_to_e5m2", FromFloat32 FP8E5M2)
+    , (renderer_name "e3m2_to_float32", ToFloat32 FP6E3M2)
+    , (renderer_name "float32_to_e3m2", FromFloat32 FP6E3M2)
+    , (renderer_name "e5m3_to_float32", ToFloat32 OotomoE5M3)
+    , (renderer_name "float32_to_e5m3", FromFloat32 OotomoE5M3)
+    , (renderer_name "float16_add", NarrowBinaryPrimitive Binary16 AddNarrow)
+    , (renderer_name "float16_subtract", NarrowBinaryPrimitive Binary16 SubtractNarrow)
+    , (renderer_name "float16_multiply", NarrowBinaryPrimitive Binary16 MultiplyNarrow)
+    , (renderer_name "float16_divide", NarrowBinaryPrimitive Binary16 DivideNarrow)
+    , (renderer_name "e4m3_add", NarrowBinaryPrimitive FP8E4M3 AddNarrow)
+    , (renderer_name "e4m3_subtract", NarrowBinaryPrimitive FP8E4M3 SubtractNarrow)
+    , (renderer_name "e4m3_multiply", NarrowBinaryPrimitive FP8E4M3 MultiplyNarrow)
+    , (renderer_name "e4m3_divide", NarrowBinaryPrimitive FP8E4M3 DivideNarrow)
+    , (renderer_name "e5m2_add", NarrowBinaryPrimitive FP8E5M2 AddNarrow)
+    , (renderer_name "e5m2_subtract", NarrowBinaryPrimitive FP8E5M2 SubtractNarrow)
+    , (renderer_name "e5m2_multiply", NarrowBinaryPrimitive FP8E5M2 MultiplyNarrow)
+    , (renderer_name "e5m2_divide", NarrowBinaryPrimitive FP8E5M2 DivideNarrow)
+    , (renderer_name "e3m2_add", NarrowBinaryPrimitive FP6E3M2 AddNarrow)
+    , (renderer_name "e3m2_subtract", NarrowBinaryPrimitive FP6E3M2 SubtractNarrow)
+    , (renderer_name "e3m2_multiply", NarrowBinaryPrimitive FP6E3M2 MultiplyNarrow)
+    , (renderer_name "e3m2_divide", NarrowBinaryPrimitive FP6E3M2 DivideNarrow)
+    ]
 
 private
 add_constraint : RepresentationConstraint -> BuildState -> BuildState
