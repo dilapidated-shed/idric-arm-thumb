@@ -1,217 +1,294 @@
-# Binary circle machine representation
+# Finite circle machine representations
 
-This note specifies a finite circular value as a machine representation, not
-merely as an abstract modular-number type.
+This note specifies circular machine values. BAM/BAMS is an important machine
+precedent, but a power of two is not required: different finite circles preserve
+different exact rotations.
 
-The immediate machine precedent is Binary Angle Measurement / the Binary
-Angular Measurement System (BAM/BAMS): an unsigned binary word represents a
-fraction of one complete turn. Hardware and DSP documentation uses this form
-because ordinary fixed-width addition and subtraction already perform the
-required wraparound.
+References:
 
-Reference precedents:
-
-- Microchip BAMS definition:
+- Microchip BAMS:
   https://onlinedocs.microchip.com/oxy/GUID-66AC09C2-8D1C-4C0C-A351-24C77EC714B0-en-US-6/GUID-D42077A2-62CF-4949-B15B-E0DEF7894036.html
-- BBG binary-angle bit table:
+- BBG binary-angle table:
   https://www.bbginc.com/wp-content/uploads/2022/01/DataSheet_BBG-1108b.pdf
-- Ada modular types are a useful language-level analogue:
+- Ada modular types, as a language-level analogue:
   https://www.adaic.org/resources/add_content/standards/22rm/html/RM-3-5-4.html
 
-## Finite circle
+## Machine model
 
-For a power-of-two circle with
+A `Circle N` has exactly `N` positions around one complete turn.
 
-```text
-m = 2^n
-```
-
-points, store a point as an unsigned `n`-bit integer
+A canonical stored code `u` denotes
 
 ```text
-u = 0 .. m-1
+u / N turns
 ```
 
-and interpret it as
+for
 
 ```text
-u / m turns
+0 <= u < N
 ```
 
-around the circle.
+The storage container may have spare bit patterns when `N` is not a power of
+two. Those spare patterns are not circle values.
 
-A source spelling may therefore use the number of points:
+The source language need not expose integer addition or subtraction on circle
+points.
+
+## Public geometric operations
+
+The ordinary interface should speak in geometric operations.
+
+### Rotation
+
+A rotation is a displacement around the circle.
 
 ```text
-Circle 256
-Circle 65536
+rotate : Rotation N -> Circle N -> Circle N
 ```
 
-while the machine representation is respectively 8 or 16 bits.
-
-For `Circle 256`, one step is
+The backend may implement rotation using modular integer addition:
 
 ```text
-1 / 256 turn = 1.40625 degrees
+rotate(code, r) = (code + r) mod N
 ```
 
-and the familiar binary fractions of a turn are visible directly:
+but that integer addition is an implementation detail, not the source-level
+meaning.
+
+Composition belongs to rotations:
 
 ```text
-00000000    0 turns       0 degrees
-00100000    1/8 turn     45 degrees
-01000000    1/4 turn     90 degrees
-10000000    1/2 turn    180 degrees
-11000000    3/4 turn    270 degrees
+compose_rotations : Rotation N -> Rotation N -> Rotation N
 ```
 
-## Circle operations
+### Reflection
 
-The public operations are geometric circle operations.
+A reflection reverses orientation around an axis.
 
-### Rotate
-
-Rotate a point by a circular displacement:
+The zero-axis case lowers to
 
 ```text
-rotate(point, delta) = (point + delta) mod m
+reflect_zero(code) = (-code) mod N
 ```
 
-Composition of rotations is the same modular addition:
+More general reflections can be represented as a rotation composed with this
+basic reflection.
+
+Rotations and reflections generate the dihedral symmetries of the regular
+`N`-gon.
+
+### Local displacement
+
+When a derivative or local linear model needs motion between two nearby circle
+positions, use an explicit operation such as
 
 ```text
-compose(a, b) = (a + b) mod m
+local_displacement : Circle N -> Circle N -> Tangent N
 ```
 
-For `Circle 256`:
+rather than giving `Circle N` a general subtraction operator.
 
-```text
-rotate_45(x)  = x + 32  mod 256
-rotate_90(x)  = x + 64  mod 256
-rotate_180(x) = x + 128 mod 256
-```
-
-These are additions on the circle, not bit shifts.
-
-### Reflect
-
-Reflection through zero reverses orientation:
-
-```text
-reflect(x) = (-x) mod m
-```
-
-Together, rotations and reflection give the usual symmetries of the regular
-`m`-gon.
-
-### Local signed difference
-
-The difference between two circle points is not another global circle point when
-we are asking for local motion. It is a signed tangent displacement.
-
-Define
-
-```text
-difference(to, from)
-    = signed_n((to - from) mod 2^n)
-```
-
-where `signed_n` reinterprets the same `n` bits as two's-complement.
-
-The result lies in
-
-```text
-[-m/2, m/2)
-```
-
-steps, corresponding to
-
-```text
-[-1/2, 1/2)
-```
-
-turn.
-
-The exact half-turn is geometrically ambiguous; this representation chooses the
-negative half-turn as the canonical signed result.
-
-This operation is the one to use when a later calculation needs an ordinary
-linear displacement, derivative, Jacobian entry, or tangent coordinate.
-
-## Equality and order
-
-Equality is equality of circular position.
-
-There is no intrinsic global less-than order on a circle. A backend may compare
-the raw unsigned encodings for implementation purposes, but that raw ordering
-must not silently become semantic circle ordering.
+The result is the shortest signed displacement, with a documented tie rule at an
+exact half turn when `N` is even. This result is linear/tangent data, not
+another circle point.
 
 ## Shifts are not circle operations
 
-The underlying storage word can of course be shifted as bits, but left shift,
-right shift, and rotate-through-carry are representation operations rather than
-operations of this circle type.
+Bit shifts may exist on a storage word. They are not rotations or reflections
+and should not appear in the ordinary `Circle` interface.
 
-In particular, a left shift would implement an angle-doubling map after
-truncation; it is not a rigid rotation. It should therefore not appear in the
-ordinary `Circle` interface merely because the payload is binary.
+For a binary BAM value, left shift happens to implement angle doubling modulo
+one turn. That is a different map from rigid rotation.
 
-## Exact named rotations
+## Useful finite circles
 
-A named fraction of a turn is exact when its denominator divides the number of
-points.
+There should not be one mandatory circle size. Choose a representation whose
+exact rotations match the problem.
 
-For every power-of-two circle, halves, quarters, eighths, and so on are exact.
-Thirds and sixths are not exact in `Circle 256`:
+### Circle 144
 
 ```text
-30 degrees = 21 1/3 steps
-60 degrees = 42 2/3 steps
+step = 2.5 degrees
 ```
 
-If exact 30- and 60-degree rotations are a requirement, the number of points
-must include a factor of 3; that is a different representation tradeoff from
-pure power-of-two BAM/BAMS.
+Exact examples:
 
-## Choosing the number of points
+```text
+10 degrees    4 ticks
+12.5 degrees  5 ticks
+15 degrees    6 ticks
+30 degrees   12 ticks
+45 degrees   18 ticks
+60 degrees   24 ticks
+90 degrees   36 ticks
+```
 
-Do not choose 16 bits merely because 16 bits are cheap.
+This is a compact choice when 10 and 12.5 degrees matter.
 
-Choose the smallest circle whose step is comfortably finer than the physical
-setting or measurement uncertainty. More stored positions than the mechanism
-can distinguish add no useful information.
+### Circle 192
 
-For the present cam-rotation work, `Circle 256` is a plausible machine scale
-because one step is about 1.4 degrees. The final choice should follow measured
-repeatability rather than an arbitrary preference for a wider word.
+```text
+step = 1.875 degrees
+```
+
+Exact examples:
+
+```text
+3.75 degrees   2 ticks
+7.5 degrees    4 ticks
+15 degrees     8 ticks
+30 degrees    16 ticks
+45 degrees    24 ticks
+60 degrees    32 ticks
+90 degrees    48 ticks
+```
+
+This matches the classical repeated-bisection family particularly well.
+
+### Circle 240
+
+```text
+step = 1.5 degrees
+```
+
+Exact examples:
+
+```text
+7.5 degrees    5 ticks
+15 degrees    10 ticks
+30 degrees    20 ticks
+45 degrees    30 ticks
+60 degrees    40 ticks
+72 degrees    48 ticks
+90 degrees    60 ticks
+```
+
+Because 240 = 2^4 * 3 * 5, this circle preserves many square/triangle/pentagon
+symmetries at once. Five-fold rotation is exact, making it especially useful for
+regular-pentagon and golden-ratio constructions.
+
+### Circle 256
+
+```text
+step = 1.40625 degrees
+```
+
+This is the ordinary 8-bit BAM-style choice. Dyadic fractions of a turn are
+visually immediate in the bits, but thirds and fifths are not exact.
+
+### Circle 360
+
+```text
+step = 1 degree
+```
+
+This is the straightforward exact-degree circle. It needs at least 9 storage
+bits and modular reduction by 360 rather than a simple bit mask.
+
+### Circle 384
+
+```text
+step = 0.9375 degrees
+```
+
+Exact examples:
+
+```text
+3.75 degrees   4 ticks
+7.5 degrees    8 ticks
+15 degrees    16 ticks
+30 degrees    32 ticks
+45 degrees    48 ticks
+60 degrees    64 ticks
+90 degrees    96 ticks
+```
+
+This is a useful 9-bit extension of the bisection/thirds family: resolution is
+finer than one degree while the classical 30/45/60/90 and repeated-halving
+angles remain exact. One degree itself is not exact.
+
+### Circle 720
+
+```text
+step = 0.5 degree
+```
+
+This exactly represents every half degree, every integer degree, 12.5 degrees,
+and five-fold rotations. It also matches the half-degree spacing of Ptolemy's
+surviving chord table. It needs 10 bits.
+
+## Historical angle-table connection
+
+The old trigonometric tables suggest useful machine scales rather than one
+universal binary scale.
+
+Hipparchus's chord table is reconstructed with 7.5-degree spacing; a related
+Indian tradition uses 3.75-degree spacing. Ptolemy's Almagest table uses
+half-degree spacing. Ptolemy also obtained 30, 15, 7.5, and 3.75 degrees by
+successive bisection.
+
+These are not merely historical curiosities: `Circle 192`, `Circle 384`,
+and `Circle 720` line up naturally with those step families.
+
+## Exact geometry above the machine circle
+
+Do not force exact classical geometry into the finite circle code.
+
+The compiler/type layer can represent exact algebraic quantities separately,
+including for example
+
+```text
+sqrt(5)
+phi = (1 + sqrt(5)) / 2
+```
+
+and exact fractions of a turn such as
+
+```text
+1/5 turn
+1/10 turn
+1/16 turn
+```
+
+A regular pentagon naturally connects the circular and algebraic layers:
+five-fold rotation is circular, while its chord/diagonal relations introduce
+`sqrt(5)` and `phi`.
+
+Likewise, pi is unnecessary for internal rotation when turns are the unit. Pi
+enters when converting a turn measure to radians or when relating angular data
+to circumference.
+
+Continued fractions should also live at this exact symbolic layer rather than be
+baked into one finite circle encoding. Useful canonical examples include the
+periodic continued fractions of quadratic irrationals such as `phi`,
+`sqrt(2)`, and `sqrt(5)`.
 
 ## ARM Thumb lowering
 
-For a power-of-two circle, lowering is ordinary fixed-width integer arithmetic
-with explicit narrowing at the type boundary.
+For power-of-two circles, modular reduction may be a mask/narrowing operation.
 
-For `Circle 256`:
+For non-power-of-two circles such as 144, 192, 240, 360, 384, or 720, lowering
+must reduce modulo the actual number of positions. The source semantics remain
+rotation/reflection semantics even when the backend uses ADD, SUB, compare,
+conditional subtract, multiply-high, or another integer reduction sequence.
 
-```text
-rotate       ADD then keep low 8 bits
-reflect      negate then keep low 8 bits
-difference   SUB then reinterpret low 8 bits as signed
-```
+For 8-bit circles up to 256, a byte can contain the canonical code. For larger
+circles, use the next convenient integer container; unused bit patterns remain
+invalid/noncanonical circle values.
 
-Thumb can express the boundary cheaply with byte narrowing/sign extension
-operations such as `UXTB` and `SXTB`.
-
-For `Circle 65536`, the analogous boundary uses the low 16 bits and unsigned
-or signed halfword extension.
-
-No floating-point degrees or radians are needed for internal circle arithmetic.
-Convert to human units only at an input/output boundary.
+No floating-point degrees or radians are required for the internal finite-circle
+operations.
 
 ## Compiler consequence
 
-Keep circular position distinct from ordinary linear number semantics through
-the compiler.
+Preserve the distinction among:
 
-A circle point wraps. A local signed difference does not wrap semantically; it
-is a tangent displacement. Lowering must not erase that distinction before the
-compiler has used it.
+- a point on a finite circle;
+- a rotation acting on that circle;
+- a reflection;
+- a local tangent displacement;
+- and an exact symbolic angle or algebraic construction.
+
+Do not collapse these into ordinary integer arithmetic merely because integer
+instructions are used to lower them.
