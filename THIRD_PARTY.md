@@ -65,3 +65,13 @@ DEX, APK, shared-library outputs, and receipts are generated artifacts, not
 checked-in source. The repository contains no vendored `.jar`, `.dex`, `.apk`,
 or `.so` candidate. The production `classes.dex` bytes are written directly by
 the Idriç DEX code; test-only Smali assembly remains outside that path.
+## ARM dyadic-rational research references
+
+The archived/native ARM research area `_/dyadic-rationals/` contains reference material for a possible explicit dyadic-rational representation. It is not part of the active direct-DEX implementation.
+
+Pinned source snapshots under `_/dyadic-rationals/mirror/` include:
+
+- Lean 4 `Init.Data.Dyadic` files from `leanprover/lean4@2c2bdd9630a7a6c51d7620d5efefcdba104f38f3`. Those files retain their upstream copyright notices and Apache-2.0 terms; the upstream LICENSE is copied beside them.
+- the HoTT Book `reals.tex` from `HoTT/book@578b85cc8d586b1677ec4335148adeb443057d24`. That file remains under the HoTT Book's Creative Commons Attribution-ShareAlike 3.0 Unported terms; the upstream README containing the license statement is copied beside it.
+
+`ming-t18/ConwayHs@d80a4ced80527c28306c781b60ae560975ab394a` is cited and summarized but not copied because that repository declares no license at the pinned revision.
