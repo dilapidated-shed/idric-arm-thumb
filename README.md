@@ -2,6 +2,12 @@
 
 Direct ARMv7 Thumb-2/VFP backend for Idriç, without routing numerical leaves through C.
 
+## Development lines
+
+`native-arm` is the active native ARM/Thumb development line. It reconciles the former `arm-thumb-test-suite` and `branching-dispatch-fixtures` descendants.
+
+`main` intentionally remains the separate direct-DEX line. Advancing native ARM/Thumb does not require merging this line into DEX.
+
 The first slice is deliberately small. It compiles an exported, closure-free function whose arguments and result are `RendererPrimitives.Float32` and whose body is made from local copies, Float32 addition, and Float32 multiplication.
 
 ```text

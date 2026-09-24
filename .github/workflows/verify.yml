@@ -2,7 +2,7 @@ name: verify
 
 on:
   push:
-    branches: [idric-ir-first-slice]
+    branches: [native-arm]
   pull_request:
 
 concurrency:
@@ -40,7 +40,7 @@ jobs:
           make -C Idric install-api IDRIS2_BOOT="$GITHUB_WORKSPACE/Idric/build/exec/idris2"
           make -C Idric install-support
 
-      - name: Compile, inspect, assemble, and execute Thumb verification
+      - name: Verify native ARM/Thumb numerical, PrintASCII, and branching paths
         run: make verify IDRIC="$GITHUB_WORKSPACE/Idric/build/exec/idris2"
 
       - name: Build screen-red references and execute RGB565 oracle
