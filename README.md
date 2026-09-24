@@ -93,3 +93,10 @@ FP16 arithmetic, maps the latter onto the public A55 FP/NEON pipeline and timing
 data, and records E4M3/E5M2 as existing candidates for a deliberately coarser
 numeric primitive. This is research, not a change to the accepted Armv7-A
 backend contract.
+
+
+## Compact arithmetic
+
+Low-precision values keep their compact stored representation across operation
+boundaries while using wider temporary computation where useful. See
+[`notes/compact-storage-wider-computation.md`](notes/compact-storage-wider-computation.md).
