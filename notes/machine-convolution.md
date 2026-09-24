@@ -149,3 +149,85 @@ Useful experiments:
 - compare immediate normalization against delayed/redundant accumulation;
 - inspect whether a carry-saving representation wins after instruction count,
   register pressure, and memory traffic are included.
+
+
+## Concrete Thumb-2 arithmetic consequences
+
+For this backend, avoid generic discussion of "a CPU multiplier" when the
+instruction-level question can be stated exactly.
+
+The portable contract is ARMv7-A AArch32/T32 (Thumb-2).  Useful integer
+instructions include:
+
+- `ADDS` / `ADC`: canonical multiword addition with APSR carry propagation;
+- `SUBS` / `SBC`: canonical multiword subtraction/borrow;
+- `RSB`: cheap integer negation/reverse subtraction;
+- `MUL` / `MLA` / `MLS`: 32-bit product and fused integer
+  multiply-add/subtract forms;
+- `SMULL` / `UMULL`: 32 x 32 -> 64-bit product;
+- `SMLAL` / `UMLAL`: 32 x 32 product accumulated into a 64-bit pair;
+- `SMLAD`, `SMUAD`, related packed-halfword DSP operations where the
+  architecture/profile and exact operand layout make them legal and useful;
+- `SXTB/SXTH/UXTB/UXTH` and the add variants for unpacking deliberately small
+  coefficient lanes.
+
+Do not make `SDIV`/`UDIV` part of the ARMv7-A baseline: integer divide is
+optional in ARMv7-A.  Constant powers of three should first be considered as
+compile-time strength reductions, reciprocal/table schemes, or representation
+changes rather than assuming a divide instruction.
+
+For balanced ternary specifically, multiplication by a single digit does not
+need `MUL`: multiplying by `-1, 0, +1` is sign/select logic.  The expensive
+part is accumulation and eventual normalization.
+
+For chunked radix-`3^k` arithmetic, the backend should compare at least these
+forms:
+
+1. canonical chunks with an `ADDS/ADC` carry chain;
+2. a wider accumulator that admits several chunk sums before normalization;
+3. redundant signed-digit/chunk accumulators with a final canonicalization;
+4. for multiplication, `UMULL/SMULL` plus `UMLAL/SMLAL` accumulation rather
+   than materializing every shifted partial product separately.
+
+"Shifted partial products", "compressor tree", and "carry-save stages" are
+hardware-design descriptions unless we deliberately expose an equivalent
+redundant representation in software.  The Thumb backend cannot command the
+core's internal compressor tree.  It can, however, arrange the instruction
+stream so the core sees fewer architecturally serialized carry dependencies.
+
+A useful acceptance comparison is therefore not "did we emit a compressor
+tree?" but:
+
+```text
+canonical carry chain
+vs
+widened/delayed-normalization accumulator
+vs
+redundant accumulator + one final normalization
+```
+
+Measure instruction count, true register dependencies, register pressure,
+loads/stores, and cycles on the physical phone.
+
+## Physical-phone microarchitecture
+
+The MIRO A1 is sold as using an SC9863-family SoC with Cortex-A55 cores.  Treat
+that as a hardware hypothesis to verify from the device itself before making a
+hard backend contract.
+
+Cortex-A55 is an in-order superscalar Armv8.2-A core and supports AArch32 at
+EL0.  That makes independent accumulators especially worth testing: on an
+in-order superscalar machine, one long dependency chain can inhibit overlap
+that independent chains might expose.
+
+Even here, do not invent gate-level details.  Public Arm architectural and
+Cortex-A55 material gives instruction behavior and high-level pipeline facts;
+it does not document the exact transistor/gate topology of the integer adder or
+its carry-prefix network.  If exact adder topology matters, it must come from a
+specific disclosed implementation or measurement, not from the label
+"ARMv7-A", "Thumb-2", or "Cortex-A55".
+
+The backend should continue emitting only the chosen ARMv7-A Thumb-2 subset
+unless a separate target explicitly opts into later Armv8/A55 instructions.
+The fact that the physical phone may have newer hardware is not permission to
+silently widen the compiler target.
