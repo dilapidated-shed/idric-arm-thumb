@@ -1,30 +1,17 @@
 module RendererPrimitives
 
+import Prelude.Float16
+import Prelude.LowPrecision
+
 %default total
 
 ||| Explicit unboxed renderer scalar used at the ARM ABI seam.
 export
 data Float32 : Type where [external]
 
-||| IEEE 754 binary16 scalar payload.
-export
-data Float16 : Type where [external]
-
-||| OCP OFP8 E4M3 scalar payload.
-export
-data E4M3 : Type where [external]
-
-||| OCP OFP8 E5M2 scalar payload.
-export
-data E5M2 : Type where [external]
-
-||| OCP MX FP6 E3M2 scalar payload.
-export
-data E3M2 : Type where [external]
-
-||| Ootomo-Naruse unsigned E5M3 storage scalar payload.
-export
-data E5M3 : Type where [external]
+-- Float16, E4M3, E5M2, E3M2, and E5M3 are canonical Prelude types.
+-- This module supplies target-specific conversion and arithmetic primitives;
+-- it does not define a second backend-only family of source types.
 
 ||| Caller-owned contiguous Float32 memory. The backend assumes a non-null,
 ||| suitably aligned pointer and an in-bounds Int32 index at the FFI boundary.
