@@ -8,6 +8,7 @@ depends = idris2
 modules =
   Backend.ARMThumb.IR,
   Backend.ARMThumb.Lower,
+  Backend.ARMThumb.Scalar,
   Backend.ARMThumb.Emit,
   Backend.ARMThumb.Codegen,
   Backend.ARMThumb.Main,
