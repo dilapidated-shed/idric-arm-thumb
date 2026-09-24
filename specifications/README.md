@@ -1,13 +1,14 @@
 # Scalar numeric reference specifications
 
-This directory keeps the five scalar-format references currently used by the
-ARM Thumb work:
+This directory keeps the six scalar and circular machine-format references
+currently used by the ARM Thumb work:
 
 1. [Float16 / IEEE binary16](float16.md)
 2. [FP8 / OCP OFP8](fp8.md)
 3. [E3M2 / OCP FP6 element format](e3m2.md)
 4. [E5M3 / Ootomo-Naruse unsigned 8-bit storage format](e5m3.md)
 5. [Bits8 / Idris 2 unsigned 8-bit primitive](bits8.md)
+6. [Binary circle / BAM-BAMS machine representation](binary-circle.md)
 
 Each local file is a complete implementation-oriented restatement of the format
 contract needed by this repository and links to the exact upstream reference.
@@ -21,3 +22,6 @@ The formats are deliberately kept distinct. In particular:
 - Ootomo-Naruse E5M3 is an **unsigned** 8-bit storage format: five exponent
   bits plus three mantissa bits and no sign bit.
 - Bits8 is an unsigned modular integer, not a floating-point format.
+- Binary circle values use fixed-width modular storage to represent positions
+  around one complete cycle; local signed differences are linear tangent
+  displacements rather than circle points.
