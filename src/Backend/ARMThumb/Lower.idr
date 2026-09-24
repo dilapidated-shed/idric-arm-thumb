@@ -5,6 +5,7 @@ import Compiler.ANF
 import Core.Name
 import Core.Name.Namespace
 import Core.TT.Primitive
+import Data.Vect
 
 %default covering
 
@@ -358,21 +359,30 @@ lower_value destination (APrimVal _ (I32 value)) state = do
 lower_value destination (APrimVal _ (B8 value)) state = do
   with_destination <- bind_variable "Let destination" destination state
   Right (add_bits8_constant destination (cast value) with_destination)
-lower_value destination (AOp _ _ (Add Bits8Type) [ALocal left, ALocal right]) state = do
-  require_bound "Bits8 add left operand" left state
-  require_bound "Bits8 add right operand" right state
-  with_destination <- bind_variable "Let destination" destination state
-  Right (add_bits8_binary AddBits8 destination left right with_destination)
-lower_value destination (AOp _ _ (Sub Bits8Type) [ALocal left, ALocal right]) state = do
-  require_bound "Bits8 subtract left operand" left state
-  require_bound "Bits8 subtract right operand" right state
-  with_destination <- bind_variable "Let destination" destination state
-  Right (add_bits8_binary SubtractBits8 destination left right with_destination)
-lower_value destination (AOp _ _ (Mul Bits8Type) [ALocal left, ALocal right]) state = do
-  require_bound "Bits8 multiply left operand" left state
-  require_bound "Bits8 multiply right operand" right state
-  with_destination <- bind_variable "Let destination" destination state
-  Right (add_bits8_binary MultiplyBits8 destination left right with_destination)
+lower_value destination (AOp _ _ (Add Bits8Type) arguments) state =
+  case toList arguments of
+    [ALocal left, ALocal right] => do
+      require_bound "Bits8 add left operand" left state
+      require_bound "Bits8 add right operand" right state
+      with_destination <- bind_variable "Let destination" destination state
+      Right (add_bits8_binary AddBits8 destination left right with_destination)
+    _ => Left "Bits8 add did not have two local operands"
+lower_value destination (AOp _ _ (Sub Bits8Type) arguments) state =
+  case toList arguments of
+    [ALocal left, ALocal right] => do
+      require_bound "Bits8 subtract left operand" left state
+      require_bound "Bits8 subtract right operand" right state
+      with_destination <- bind_variable "Let destination" destination state
+      Right (add_bits8_binary SubtractBits8 destination left right with_destination)
+    _ => Left "Bits8 subtract did not have two local operands"
+lower_value destination (AOp _ _ (Mul Bits8Type) arguments) state =
+  case toList arguments of
+    [ALocal left, ALocal right] => do
+      require_bound "Bits8 multiply left operand" left state
+      require_bound "Bits8 multiply right operand" right state
+      with_destination <- bind_variable "Let destination" destination state
+      Right (add_bits8_binary MultiplyBits8 destination left right with_destination)
+    _ => Left "Bits8 multiply did not have two local operands"
 lower_value destination (APrimVal _ (I value)) state =
   Left
     ("Idriç Int is 64-bit in the pinned compiler; use Int32 in this " ++
