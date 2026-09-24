@@ -1,0 +1,220 @@
+.syntax unified
+.arch armv7-a
+.fpu vfpv3-d16
+.thumb
+.text
+
+@ Each format writes 24 halfwords:
+@   7 arithmetic/power/root observations
+@   14 Dakota Jv observations
+@   2 planar-rotation coordinates
+@   1 caster observation
+@ Result blocks are Float16, E4M3, E5M2, E3M2, E5M3.
+@ 0xffff marks a case outside the E5M3 published positive-normal domain.
+
+.macro ENCODE_F32 converter, high_half
+        movw    r0, #0x0000
+        movt    r0, #\high_half
+        bl      \converter
+.endm
+
+.macro RUN_SIMPLE base, from32, addf, subf, mulf, divf, sqrtf
+        @ add 1.5 + 0.5
+        ENCODE_F32 \from32, 0x3fc0
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x3f00
+        mov     r1, r0
+        mov     r0, r11
+        bl      \addf
+        strh    r0, [r4, #(\base + 0)]
+
+        @ subtract 1.5 - 0.5
+        ENCODE_F32 \from32, 0x3fc0
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x3f00
+        mov     r1, r0
+        mov     r0, r11
+        bl      \subf
+        strh    r0, [r4, #(\base + 2)]
+
+        @ multiply 1.5 * 0.5
+        ENCODE_F32 \from32, 0x3fc0
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x3f00
+        mov     r1, r0
+        mov     r0, r11
+        bl      \mulf
+        strh    r0, [r4, #(\base + 4)]
+
+        @ divide 1.5 / 0.5
+        ENCODE_F32 \from32, 0x3fc0
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x3f00
+        mov     r1, r0
+        mov     r0, r11
+        bl      \divf
+        strh    r0, [r4, #(\base + 6)]
+
+        @ power 1.5^2 and 1.5^3; every multiply requantizes.
+        ENCODE_F32 \from32, 0x3fc0
+        mov     r1, r0
+        bl      \mulf
+        strh    r0, [r4, #(\base + 8)]
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x3fc0
+        mov     r1, r0
+        mov     r0, r11
+        bl      \mulf
+        strh    r0, [r4, #(\base + 10)]
+
+        @ sqrt 2
+        ENCODE_F32 \from32, 0x4000
+        bl      \sqrtf
+        strh    r0, [r4, #(\base + 12)]
+
+        @ Rotate (3,4) with the same quantized inputs in every format:
+        @ cosine=7/8, sine=3/8.
+        ENCODE_F32 \from32, 0x3f60
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x4040
+        mov     r1, r0
+        mov     r0, r11
+        bl      \mulf
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x3ec0
+        mov     r10, r0
+        ENCODE_F32 \from32, 0x4080
+        mov     r1, r0
+        mov     r0, r10
+        bl      \mulf
+        mov     r1, r0
+        mov     r0, r11
+        bl      \subf
+        strh    r0, [r4, #(\base + 42)]
+
+        ENCODE_F32 \from32, 0x3ec0
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x4040
+        mov     r1, r0
+        mov     r0, r11
+        bl      \mulf
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x3f60
+        mov     r10, r0
+        ENCODE_F32 \from32, 0x4080
+        mov     r1, r0
+        mov     r0, r10
+        bl      \mulf
+        mov     r1, r0
+        mov     r0, r11
+        bl      \addf
+        strh    r0, [r4, #(\base + 44)]
+
+        @ Caster from a 4-degree camber swing using shared multiplier input 3/2.
+        ENCODE_F32 \from32, 0x4080
+        mov     r11, r0
+        ENCODE_F32 \from32, 0x3fc0
+        mov     r1, r0
+        mov     r0, r11
+        bl      \mulf
+        strh    r0, [r4, #(\base + 46)]
+.endm
+
+.macro RUN_MATRIX base, from32, addf, mulf
+        @ The existing E3M2 payload fixture is decoded to its numerical value,
+        @ then independently re-encoded in this destination format.
+        ldr     r5, =dakota_jacobian_e3m2
+        add.w   r10, r4, #(\base + 14)
+        movs    r8, #14
+.Ljacobian_row\@:
+        ldr     r6, =dakota_direction_e3m2
+        movs    r7, #0
+        movs    r9, #26
+.Ljacobian_column\@:
+        ldrb    r0, [r5], #1
+        bl      e3m2_to_f32_test
+        bl      \from32
+        mov     r11, r0
+
+        ldrb    r0, [r6], #1
+        bl      e3m2_to_f32_test
+        bl      \from32
+        mov     r1, r0
+        mov     r0, r11
+        bl      \mulf
+        mov     r1, r7
+        bl      \addf
+        mov     r7, r0
+
+        subs    r9, r9, #1
+        bne     .Ljacobian_column\@
+        strh    r7, [r10], #2
+        subs    r8, r8, #1
+        bne     .Ljacobian_row\@
+.endm
+
+.global _start
+.type _start, %function
+.thumb_func
+_start:
+        sub.w   sp, sp, #256
+        mov     r4, sp
+
+        RUN_SIMPLE 0, f32_to_float16_test, float16_add_test, float16_sub_test, float16_mul_test, float16_div_test, float16_sqrt_test
+        RUN_MATRIX 0, f32_to_float16_test, float16_add_test, float16_mul_test
+
+        RUN_SIMPLE 48, f32_to_e4m3_test, e4m3_add_test, e4m3_sub_test, e4m3_mul_test, e4m3_div_test, e4m3_sqrt_test
+        RUN_MATRIX 48, f32_to_e4m3_test, e4m3_add_test, e4m3_mul_test
+
+        RUN_SIMPLE 96, f32_to_e5m2_test, e5m2_add_test, e5m2_sub_test, e5m2_mul_test, e5m2_div_test, e5m2_sqrt_test
+        RUN_MATRIX 96, f32_to_e5m2_test, e5m2_add_test, e5m2_mul_test
+
+        RUN_SIMPLE 144, f32_to_e3m2_test, e3m2_add_test, e3m2_sub_test, e3m2_mul_test, e3m2_div_test, e3m2_sqrt_test
+        RUN_MATRIX 144, f32_to_e3m2_test, e3m2_add_test, e3m2_mul_test
+
+        RUN_SIMPLE 192, f32_to_e5m3_test, e5m3_add_observe, e5m3_sub_observe, e5m3_mul_observe, e5m3_div_observe, e5m3_sqrt_observe
+
+        @ E5M3 cannot represent the zero/negative inputs in the shared Jacobian.
+        add.w   r10, r4, #206
+        movw    r0, #0xffff
+        movs    r8, #14
+.Le5m3_domain:
+        strh    r0, [r10], #2
+        subs    r8, r8, #1
+        bne     .Le5m3_domain
+
+        @ stdout <- five blocks * 24 halfwords = 240 bytes.
+        movs    r0, #1
+        mov     r1, r4
+        movs    r2, #240
+        movs    r7, #4
+        svc     #0
+
+        add.w   sp, sp, #256
+        movs    r0, #0
+        movs    r7, #1
+        svc     #0
+
+.align 2
+dakota_direction_e3m2:
+        .byte   0x08,0x24,0x04,0x28,0x04,0x24,0x04,0x08,0x28,0x04,0x24,0x04
+        .byte   0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21
+
+dakota_jacobian_e3m2:
+        .byte   0x0c,0x29,0x03,0x00,0x00,0x00,0x27,0x00,0x00,0x0c,0x0c,0x00,0x2a,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+        .byte   0x0c,0x26,0x01,0x00,0x00,0x00,0x24,0x00,0x00,0x0c,0x0c,0x00,0x00,0x29,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+        .byte   0x0c,0x23,0x00,0x00,0x00,0x00,0x22,0x00,0x00,0x0c,0x0c,0x00,0x00,0x00,0x29,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+        .byte   0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0c,0x0c,0x00,0x00,0x00,0x00,0x27,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+        .byte   0x0c,0x03,0x00,0x00,0x00,0x00,0x01,0x00,0x00,0x0c,0x0c,0x00,0x00,0x00,0x00,0x00,0x26,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+        .byte   0x0c,0x05,0x01,0x00,0x00,0x00,0x02,0x00,0x00,0x0c,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x24,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+        .byte   0x0c,0x08,0x02,0x00,0x00,0x00,0x02,0x00,0x00,0x0c,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x23,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+        .byte   0x00,0x00,0x00,0x0c,0x28,0x02,0x00,0x00,0x00,0x0c,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+        .byte   0x00,0x00,0x00,0x0c,0x25,0x01,0x01,0x00,0x00,0x0c,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x00,0x00,0x00,0x00
+        .byte   0x00,0x00,0x00,0x0c,0x23,0x00,0x01,0x00,0x00,0x0c,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x03,0x00,0x00,0x00,0x00
+        .byte   0x00,0x00,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x0c,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x00
+        .byte   0x00,0x00,0x00,0x0c,0x03,0x00,0x21,0x00,0x00,0x0c,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x00,0x00
+        .byte   0x00,0x00,0x00,0x0c,0x06,0x01,0x23,0x00,0x00,0x0c,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x08,0x00
+        .byte   0x00,0x00,0x00,0x0c,0x09,0x03,0x26,0x00,0x00,0x0c,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x09
+
+.size _start, .-_start
+.section .note.GNU-stack,"",%progbits

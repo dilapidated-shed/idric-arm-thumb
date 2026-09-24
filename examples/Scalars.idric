@@ -180,5 +180,72 @@ e5m3_to_f32_test value = e5m3_to_float32 value
 f32_to_e5m3_test : Float32 -> E5M3
 f32_to_e5m3_test value = float32_to_e5m3 value
 
+-- Square-root observations use the same widen/compute/round rule as the
+-- binary narrow-float arithmetic.
+%export "arm-thumb:float16_sqrt_test"
+float16_sqrt_test : Float16 -> Float16
+float16_sqrt_test value =
+  let wide = float16_to_float32 value
+      rooted = float32_square_root wide
+  in float32_to_float16 rooted
+
+%export "arm-thumb:e4m3_sqrt_test"
+e4m3_sqrt_test : E4M3 -> E4M3
+e4m3_sqrt_test value =
+  let wide = e4m3_to_float32 value
+      rooted = float32_square_root wide
+  in float32_to_e4m3 rooted
+
+%export "arm-thumb:e5m2_sqrt_test"
+e5m2_sqrt_test : E5M2 -> E5M2
+e5m2_sqrt_test value =
+  let wide = e5m2_to_float32 value
+      rooted = float32_square_root wide
+  in float32_to_e5m2 rooted
+
+-- E3M2 already has e3m2_sqrt_test above.
+
+-- E5M3 remains a storage format at the language boundary.  These exported
+-- functions exist only so the numerical observation executable can apply the
+-- same decode -> Float32 operation -> encode experiment as the other formats.
+%export "arm-thumb:e5m3_add_observe"
+e5m3_add_observe : E5M3 -> E5M3 -> E5M3
+e5m3_add_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_add left_wide right_wide
+  in float32_to_e5m3 result
+
+%export "arm-thumb:e5m3_sub_observe"
+e5m3_sub_observe : E5M3 -> E5M3 -> E5M3
+e5m3_sub_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_subtract left_wide right_wide
+  in float32_to_e5m3 result
+
+%export "arm-thumb:e5m3_mul_observe"
+e5m3_mul_observe : E5M3 -> E5M3 -> E5M3
+e5m3_mul_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_multiply left_wide right_wide
+  in float32_to_e5m3 result
+
+%export "arm-thumb:e5m3_div_observe"
+e5m3_div_observe : E5M3 -> E5M3 -> E5M3
+e5m3_div_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_divide left_wide right_wide
+  in float32_to_e5m3 result
+
+%export "arm-thumb:e5m3_sqrt_observe"
+e5m3_sqrt_observe : E5M3 -> E5M3
+e5m3_sqrt_observe value =
+  let wide = e5m3_to_float32 value
+      rooted = float32_square_root wide
+  in float32_to_e5m3 rooted
+
 main : IO ()
 main = pure ()
