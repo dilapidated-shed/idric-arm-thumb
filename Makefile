@@ -158,7 +158,7 @@ reject-invalid-result: $(DRIVER) tests/source/InvalidResult.idric
 		exit 1; \
 	fi
 	grep -q 'arm-thumb rejected source ABI' $(INVALID_RESULT_LOG)
-	grep -q 'result must be RendererPrimitives.Float32' $(INVALID_RESULT_LOG)
+	grep -q 'result must be a supported scalar value' $(INVALID_RESULT_LOG)
 
 reject: reject-invalid-int reject-too-many-args reject-invalid-result
 
