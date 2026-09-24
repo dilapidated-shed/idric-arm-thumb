@@ -2,6 +2,7 @@ module Backend.ARMThumb.Emit
 
 import Backend.ARMThumb.IR
 import Backend.ARMThumb.Lower
+import Backend.ARMThumb.Scalar
 import Data.String
 
 %default total
@@ -56,11 +57,35 @@ float_unary_mnemonic AbsoluteFloat32 = "vabs.f32"
 float_unary_mnemonic SquareRootFloat32 = "vsqrt.f32"
 
 private
+narrow_binary_mnemonic : NarrowBinaryOperation -> String
+narrow_binary_mnemonic AddNarrow = "vadd.f32"
+narrow_binary_mnemonic SubtractNarrow = "vsub.f32"
+narrow_binary_mnemonic MultiplyNarrow = "vmul.f32"
+narrow_binary_mnemonic DivideNarrow = "vdiv.f32"
+
+private
+bits8_binary_lines : Bits8BinaryOperation -> List String
+bits8_binary_lines AddBits8 =
+  [ "        add.w   r0, r0, r1"
+  , "        uxtb    r0, r0"
+  ]
+bits8_binary_lines SubtractBits8 =
+  [ "        sub.w   r0, r0, r1"
+  , "        uxtb    r0, r0"
+  ]
+bits8_binary_lines MultiplyBits8 =
+  [ "        mul     r0, r0, r1"
+  , "        uxtb    r0, r0"
+  ]
+
+private
 emit_instruction : Instruction -> List String
 emit_instruction (Copy destination source) =
   load_word "r0" source ++ store_word "r0" destination
 emit_instruction (WordConstant destination value) =
   materialise_word32 value ++ store_word "r0" destination
+emit_instruction (Bits8Constant destination value) =
+  [ "        movs    r0, #" ++ show value ] ++ store_word "r0" destination
 emit_instruction (LoadFloat32 destination buffer index) =
   load_word "r0" buffer ++
   load_word "r1" index ++
@@ -77,6 +102,32 @@ emit_instruction (FloatUnary operation destination value) =
   load_float "s0" value ++
   [ "        " ++ float_unary_mnemonic operation ++ " s0, s0" ] ++
   store_float "s0" destination
+emit_instruction (NarrowToFloat32 format destination value) =
+  load_word "r0" value ++
+  [ "        bl      " ++ to_float32_helper format ] ++
+  store_word "r0" destination
+emit_instruction (Float32ToNarrow format destination value) =
+  load_word "r0" value ++
+  [ "        bl      " ++ from_float32_helper format ] ++
+  store_word "r0" destination
+emit_instruction (NarrowBinary format operation destination left right) =
+  load_word "r0" left ++
+  [ "        bl      " ++ to_float32_helper format
+  , "        vmov    s0, r0"
+  ] ++
+  load_word "r0" right ++
+  [ "        bl      " ++ to_float32_helper format
+  , "        vmov    s1, r0"
+  , "        " ++ narrow_binary_mnemonic operation ++ " s0, s0, s1"
+  , "        vmov    r0, s0"
+  , "        bl      " ++ from_float32_helper format
+  ] ++
+  store_word "r0" destination
+emit_instruction (Bits8Binary operation destination left right) =
+  load_word "r0" left ++
+  load_word "r1" right ++
+  bits8_binary_lines operation ++
+  store_word "r0" destination
 
 private
 emit_instructions : List Instruction -> List String
@@ -126,6 +177,12 @@ validate_instruction function (WordConstant destination value) = do
   if value >= -2147483648 && value <= 2147483647
     then Right ()
     else Left ("Word constant is outside signed Int32 range: " ++ show value)
+validate_instruction function (Bits8Constant destination value) = do
+  validate_local_home function destination
+  expect_representation "Bits8 constant" Bits8Value destination
+  if value >= 0 && value <= 255
+    then Right ()
+    else Left ("Bits8 constant is outside 0..255: " ++ show value)
 validate_instruction function (LoadFloat32 destination buffer index) = do
   validate_local_home function destination
   validate_local_home function buffer
@@ -145,6 +202,36 @@ validate_instruction function (FloatUnary operation destination value) = do
   validate_local_home function value
   expect_representation "Float unary result" Float32 destination
   expect_representation "Float unary operand" Float32 value
+validate_instruction function (NarrowToFloat32 format destination value) = do
+  validate_local_home function destination
+  validate_local_home function value
+  expect_representation "Narrow conversion result" Float32 destination
+  expect_representation "Narrow conversion operand"
+    (format_representation format) value
+validate_instruction function (Float32ToNarrow format destination value) = do
+  validate_local_home function destination
+  validate_local_home function value
+  expect_representation "Narrow conversion result"
+    (format_representation format) destination
+  expect_representation "Narrow conversion operand" Float32 value
+validate_instruction function (NarrowBinary format operation destination left right) = do
+  validate_local_home function destination
+  validate_local_home function left
+  validate_local_home function right
+  let representation = format_representation format
+  expect_representation "Narrow binary result" representation destination
+  expect_representation "Narrow binary left operand" representation left
+  expect_representation "Narrow binary right operand" representation right
+  if format == OotomoE5M3
+    then Left "Ootomo-Naruse E5M3 defines storage conversion, not arithmetic"
+    else Right ()
+validate_instruction function (Bits8Binary operation destination left right) = do
+  validate_local_home function destination
+  validate_local_home function left
+  validate_local_home function right
+  expect_representation "Bits8 binary result" Bits8Value destination
+  expect_representation "Bits8 binary left operand" Bits8Value left
+  expect_representation "Bits8 binary right operand" Bits8Value right
 
 private
 validate_instructions : LeafFunction -> List Instruction -> Either String ()
@@ -159,6 +246,17 @@ validate_arguments function [] = Right ()
 validate_arguments function (argument :: rest) = do
   validate_local_home function argument
   validate_arguments function rest
+
+private
+is_scalar_result : Representation -> Bool
+is_scalar_result Float32 = True
+is_scalar_result Bits8Value = True
+is_scalar_result Float16Value = True
+is_scalar_result E4M3Value = True
+is_scalar_result E5M2Value = True
+is_scalar_result E3M2Value = True
+is_scalar_result E5M3Value = True
+is_scalar_result _ = False
 
 private
 validate_leaf_for_emission : LeafFunction -> Either String ()
@@ -178,7 +276,9 @@ validate_leaf_for_emission function = do
   validate_arguments function function.arguments
   validate_instructions function function.instructions
   validate_local_home function function.result
-  expect_representation "Function result" Float32 function.result
+  if is_scalar_result function.result.representation
+    then Right ()
+    else Left ("Function result is not a supported scalar: " ++ show function.result)
 
 ||| Emit Android armeabi-v7a Thumb-2. Arguments cross the softfp C ABI as
 ||| raw one-word values in r0-r3; VFPv3-D16 is used inside numerical leaves.
@@ -193,13 +293,14 @@ emit_leaf function = do
      , "        .type " ++ function.external_symbol ++ ", %function"
      , "        .thumb_func"
      , function.external_symbol ++ ":"
+     , "        push    {r4, lr}"
      , "        sub.w   sp, sp, #" ++ show function.frame_bytes
      ] ++
      store_arguments function.arguments argument_registers ++
      emit_instructions function.instructions ++
      load_word "r0" function.result ++
      [ "        add.w   sp, sp, #" ++ show function.frame_bytes
-     , "        bx      lr"
+     , "        pop     {r4, pc}"
      , "        .size " ++ function.external_symbol ++ ", .-" ++ function.external_symbol
      ]))
 
@@ -220,4 +321,4 @@ assembly_header =
 public export
 assembly_footer : String
 assembly_footer =
-  "\n.section .note.GNU-stack,\"\",%progbits\n"
+  scalar_helpers ++ "\n.section .note.GNU-stack,\"\",%progbits\n"
