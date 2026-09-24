@@ -130,6 +130,44 @@ e3m2_mul_test left right = e3m2_multiply left right
 e3m2_div_test : E3M2 -> E3M2 -> E3M2
 e3m2_div_test left right = e3m2_divide left right
 
+%export "arm-thumb:e3m2_square_test"
+e3m2_square_test : E3M2 -> E3M2
+e3m2_square_test value = e3m2_multiply value value
+
+%export "arm-thumb:e3m2_cube_test"
+e3m2_cube_test : E3M2 -> E3M2
+e3m2_cube_test value =
+  let square = e3m2_multiply value value
+  in e3m2_multiply square value
+
+%export "arm-thumb:e3m2_sqrt_test"
+e3m2_sqrt_test : E3M2 -> E3M2
+e3m2_sqrt_test value =
+  let wide = e3m2_to_float32 value
+      rooted = float32_square_root wide
+  in float32_to_e3m2 rooted
+
+%export "arm-thumb:e3m2_dot2_test"
+e3m2_dot2_test : E3M2 -> E3M2 -> E3M2 -> E3M2 -> E3M2
+e3m2_dot2_test a b x y =
+  let ax = e3m2_multiply a x
+      by = e3m2_multiply b y
+  in e3m2_add ax by
+
+%export "arm-thumb:e3m2_rotate_x_test"
+e3m2_rotate_x_test : E3M2 -> E3M2 -> E3M2 -> E3M2 -> E3M2
+e3m2_rotate_x_test cosine sine x y =
+  let cx = e3m2_multiply cosine x
+      sy = e3m2_multiply sine y
+  in e3m2_subtract cx sy
+
+%export "arm-thumb:e3m2_rotate_y_test"
+e3m2_rotate_y_test : E3M2 -> E3M2 -> E3M2 -> E3M2 -> E3M2
+e3m2_rotate_y_test sine cosine x y =
+  let sx = e3m2_multiply sine x
+      cy = e3m2_multiply cosine y
+  in e3m2_add sx cy
+
 %export "arm-thumb:e5m3_identity"
 e5m3_identity : E5M3 -> E5M3
 e5m3_identity value = value
