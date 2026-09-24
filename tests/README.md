@@ -14,20 +14,19 @@ The backend test suite is layered so failures point at the contract that broke.
 Exact Float32 checks currently include ordinary arithmetic, signed zero, exact fractional/negative results, buffer loads, identity/unused arguments, and the four-register one-word softfp argument boundary. NaN payload behavior is intentionally not asserted until that bit-level contract is specified.
 
 
-## E3M2 observational residue measurements
+## Narrow-float observational residue measurements
 
-`make e3m2-observe` executes E3M2 arithmetic in the generated Thumb program and
-prints the reference value, observed E3M2 value, and numerical residue
-(`observed - reference`). The numerical residue is deliberately not a pass/fail
-criterion.
+`make low-precision-observe` executes the same numerical suite for Float16,
+E4M3, E5M2, E3M2, and E5M3. It prints the reference value, observed value,
+and numerical residue (`observed - reference`) for arithmetic, powers, square
+root, the 14-by-26 Dakota Jacobian-vector product, planar rotation, and caster.
+Residue is reported rather than graded.
 
-The cases include add/subtract/multiply/divide, square, cube, square root, the recovered 14-by-26 Dakota sweep measurement-model Jacobian, a planar rotation using
-the same steering-ratio angle as the caster work, and the two-position caster
-multiplier. The runner only fails if the program cannot execute or does not emit
-the expected number of observation payloads.
+The established E3M2 Jacobian/direction fixture defines the shared numerical
+inputs: those payloads are decoded once and the resulting values are re-encoded
+independently in each destination format. E5M3 remains an unsigned
+positive-normal storage format. Its positive-domain cases use test-only
+decode/Float32-operation/encode wrappers; Jacobian cases requiring zero or
+negative values are reported explicitly as outside the format domain.
 
-
-The Jacobian observation deliberately quantizes all 364 named partial
-derivatives before executing a 14-by-26 matrix-vector product. At the current
-E3M2 scale, 278 of the 364 matrix entries become zero; that loss is reported as
-part of the measurement rather than treated as a test failure.
+`make e3m2-observe` remains as a filtered view of the same executable.
