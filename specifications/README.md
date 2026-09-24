@@ -8,7 +8,7 @@ currently used by the ARM Thumb work:
 3. [E3M2 / OCP FP6 element format](e3m2.md)
 4. [E5M3 / Ootomo-Naruse unsigned 8-bit storage format](e5m3.md)
 5. [Bits8 / Idris 2 unsigned 8-bit primitive](bits8.md)
-6. [Binary circle / BAM-BAMS machine representation](binary-circle.md)
+6. [Finite circle machine representations](binary-circle.md)
 
 Each local file is a complete implementation-oriented restatement of the format
 contract needed by this repository and links to the exact upstream reference.
@@ -22,6 +22,6 @@ The formats are deliberately kept distinct. In particular:
 - Ootomo-Naruse E5M3 is an **unsigned** 8-bit storage format: five exponent
   bits plus three mantissa bits and no sign bit.
 - Bits8 is an unsigned modular integer, not a floating-point format.
-- Binary circle values use fixed-width modular storage to represent positions
-  around one complete cycle; local signed differences are linear tangent
-  displacements rather than circle points.
+- Finite circle values use bounded modular storage to represent positions around
+  one complete cycle; the modulus need not be a power of two, and local signed
+  displacements are linear/tangent data rather than circle points.
