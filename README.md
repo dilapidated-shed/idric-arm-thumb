@@ -42,3 +42,10 @@ to grant it. [`THIRD_PARTY.md`](THIRD_PARTY.md) records external tools and one
 unresolved copied-source issue in the DEX compiler-handoff glue. Independent
 Git ancestry from ARM fixes the backend architecture; it does not by itself
 erase copied-text provenance.
+
+
+## Scalar numeric references
+
+The ARM Thumb numeric-format references are collected in
+[`specifications/`](specifications/README.md): Float16/binary16, OCP FP8,
+OCP E3M2, Ootomo-Naruse E5M3, and Idris 2 Bits8.
