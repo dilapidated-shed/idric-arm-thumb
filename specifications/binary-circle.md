@@ -363,6 +363,19 @@ For 8-bit circles up to 256, a byte can contain the canonical code. For larger
 circles, use the next convenient integer container; unused bit patterns remain
 invalid/noncanonical circle values.
 
+For `Circle96 = 3 * 32`, a seven-bit canonical payload admits particularly
+simple field inspection even though rotation itself still reduces modulo 96:
+
+```text
+canonical(code)       = code < 96
+third_sector(code)    = code >> 5
+position_in_third     = code & 31
+```
+
+Thus extracting the geometric third and the binary coordinate within that third
+needs only ordinary shift/mask operations. Those are representation inspection
+operations; they are not themselves circle rotations.
+
 No floating-point degrees or radians are required for the internal finite-circle
 operations.
 
