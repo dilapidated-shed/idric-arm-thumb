@@ -15,6 +15,8 @@ AFFINE_ASSEMBLY := build/exec/affine.arm-thumb.S
 AFFINE_OBJECT := build/exec/affine.arm-thumb.o
 OPERATIONS_ASSEMBLY := build/exec/operations.arm-thumb.S
 OPERATIONS_OBJECT := build/exec/operations.arm-thumb.o
+COMPLEX_ASSEMBLY := build/exec/complex-polar.arm-thumb.S
+COMPLEX_OBJECT := build/exec/complex-polar.arm-thumb.o
 SELFTEST := build/exec/backend-selftest
 INVALID_INT_LOG := build/exec/invalid-int.log
 TOO_MANY_ARGS_LOG := build/exec/too-many-args.log
@@ -76,10 +78,14 @@ $(AFFINE_ASSEMBLY): $(DRIVER) examples/Affine.idric
 		./$(DRIVER) --cg arm-thumb --source-dir examples examples/Affine.idric -o affine
 
 $(OPERATIONS_ASSEMBLY): $(DRIVER) examples/Operations.idric
-	IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
+	IDRIS2_PATH="$(CURDIR)/build/ttc:${IDRIS2_PATH}" \
 		./$(DRIVER) --cg arm-thumb --source-dir examples examples/Operations.idric -o operations
 
-examples: $(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY)
+$(COMPLEX_ASSEMBLY): $(DRIVER) examples/ComplexPolar.idric
+	IDRIS2_PATH="$(CURDIR)/build/ttc:${IDRIS2_PATH}" \
+		./$(DRIVER) --cg arm-thumb --source-dir examples examples/ComplexPolar.idric -o complex-polar
+
+examples: $(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY) $(COMPLEX_ASSEMBLY)
 
 inspect: examples
 	grep -q '^evaluate_affine:' $(AFFINE_ASSEMBLY)
@@ -106,6 +112,16 @@ inspect: examples
 	grep -q 'vsqrt.f32' $(OPERATIONS_ASSEMBLY)
 	grep -Eq 'add\.w[[:space:]]+r0, r0, r1, lsl #2' $(OPERATIONS_ASSEMBLY)
 	grep -q 'movw' $(OPERATIONS_ASSEMBLY)
+	grep -q '^complex64_real_magnitude:' $(COMPLEX_ASSEMBLY)
+	grep -q '^complex64_real_phase:' $(COMPLEX_ASSEMBLY)
+	grep -q '^complex64_mul_magnitude:' $(COMPLEX_ASSEMBLY)
+	grep -q '^complex64_div_phase:' $(COMPLEX_ASSEMBLY)
+	grep -q '^complex64_conjugate_phase:' $(COMPLEX_ASSEMBLY)
+	grep -q 'vmul.f32' $(COMPLEX_ASSEMBLY)
+	grep -q 'vdiv.f32' $(COMPLEX_ASSEMBLY)
+	grep -q 'vadd.f32' $(COMPLEX_ASSEMBLY)
+	grep -q 'vsub.f32' $(COMPLEX_ASSEMBLY)
+	grep -q 'vneg.f32' $(COMPLEX_ASSEMBLY)
 
 reject-invalid-int: $(DRIVER) tests/source/InvalidInt.idric
 	@set -e; \
@@ -153,11 +169,16 @@ $(OPERATIONS_OBJECT): $(OPERATIONS_ASSEMBLY)
 	$(ARM_CLANG) --target=$(ARM_TARGET) -c -fPIC -march=armv7-a -mthumb \
 		-mfpu=vfpv3-d16 -mfloat-abi=softfp $(OPERATIONS_ASSEMBLY) -o $(OPERATIONS_OBJECT)
 
-assemble: $(AFFINE_OBJECT) $(OPERATIONS_OBJECT)
+$(COMPLEX_OBJECT): $(COMPLEX_ASSEMBLY)
+	$(ARM_CLANG) --target=$(ARM_TARGET) -c -fPIC -march=armv7-a -mthumb \
+		-mfpu=vfpv3-d16 -mfloat-abi=softfp $(COMPLEX_ASSEMBLY) -o $(COMPLEX_OBJECT)
+
+assemble: $(AFFINE_OBJECT) $(OPERATIONS_OBJECT) $(COMPLEX_OBJECT)
 
 abi: assemble
 	file $(AFFINE_OBJECT) | grep -q 'ELF 32-bit.*ARM'
 	file $(OPERATIONS_OBJECT) | grep -q 'ELF 32-bit.*ARM'
+	file $(COMPLEX_OBJECT) | grep -q 'ELF 32-bit.*ARM'
 	readelf -h $(AFFINE_OBJECT) | grep -q 'Class:.*ELF32'
 	readelf -h $(AFFINE_OBJECT) | grep -q 'Machine:.*ARM'
 	readelf -A $(AFFINE_OBJECT) | grep -q 'Tag_THUMB_ISA_use: Thumb-2'
@@ -166,14 +187,17 @@ abi: assemble
 	readelf -sW $(OPERATIONS_OBJECT) | grep -q 'float32_load_test'
 	readelf -sW $(OPERATIONS_OBJECT) | grep -q 'float32_fourth'
 	readelf -sW $(OPERATIONS_OBJECT) | grep -q 'float32_sum_four'
+	readelf -sW $(COMPLEX_OBJECT) | grep -q 'complex64_real_magnitude'
+	readelf -sW $(COMPLEX_OBJECT) | grep -q 'complex64_mul_phase'
 	@test -z "$$(nm -u $(AFFINE_OBJECT))"
-	@test -z "$$(nm -u $(OPERATIONS_OBJECT))"
+	@test -z "$(nm -u $(OPERATIONS_OBJECT))"
+	@test -z "$(nm -u $(COMPLEX_OBJECT))"
 
-$(SELFTEST): $(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY) tests/arm/backend_selftest.S
+$(SELFTEST): $(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY) $(COMPLEX_ASSEMBLY) tests/arm/backend_selftest.S
 	$(ARM_CLANG) --target=$(ARM_EXEC_TARGET) -fuse-ld=lld -nostdlib -static \
 		-march=armv7-a -mthumb -mfpu=vfpv3-d16 -mfloat-abi=softfp \
 		-Wl,-e,_start -Wl,--no-dynamic-linker \
-		$(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY) tests/arm/backend_selftest.S \
+		$(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY) $(COMPLEX_ASSEMBLY) tests/arm/backend_selftest.S \
 		-o $(SELFTEST)
 
 semantic: $(SELFTEST)
