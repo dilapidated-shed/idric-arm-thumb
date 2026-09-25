@@ -4,18 +4,22 @@ import Data.String
 
 %default total
 
-||| Unboxed one-word representations admitted by the direct ARM boundary.
+||| Unboxed representations admitted by the direct ARM numerical subset.
+||| Complex64 occupies two consecutive four-byte stack homes and is not yet
+||| admitted at the external C ABI boundary.
 public export
 data Representation
   = Word32
   | Float32
   | Float32Pointer
+  | Complex64
 
 public export
 Eq Representation where
   Word32 == Word32 = True
   Float32 == Float32 = True
   Float32Pointer == Float32Pointer = True
+  Complex64 == Complex64 = True
   _ == _ = False
 
 public export
@@ -23,6 +27,12 @@ Show Representation where
   show Word32 = "Word32"
   show Float32 = "Float32"
   show Float32Pointer = "Float32Pointer"
+  show Complex64 = "Complex64"
+
+public export
+representation_slots : Representation -> Int
+representation_slots Complex64 = 2
+representation_slots _ = 1
 
 ||| A validated ANF local and its dense four-byte stack home.
 public export
@@ -54,6 +64,16 @@ Show FloatBinaryOperation where
   show DivideFloat32 = "divide"
 
 public export
+data ComplexBinaryOperation
+  = MultiplyComplex64
+  | DivideComplex64
+
+public export
+Show ComplexBinaryOperation where
+  show MultiplyComplex64 = "complex-multiply"
+  show DivideComplex64 = "complex-divide"
+
+public export
 data FloatUnaryOperation
   = NegateFloat32
   | AbsoluteFloat32
@@ -74,6 +94,12 @@ data Instruction
   | LoadFloat32 Local Local Local
   | FloatBinary FloatBinaryOperation Local Local Local
   | FloatUnary FloatUnaryOperation Local Local
+  | MakeComplex64 Local Local Local
+  | RealToComplex64 Local Local
+  | ComplexMagnitude Local Local
+  | ComplexPhase Local Local
+  | ComplexBinary ComplexBinaryOperation Local Local Local
+  | ComplexConjugate Local Local
 
 public export
 Show Instruction where
@@ -88,6 +114,19 @@ Show Instruction where
     " " ++ show left ++ " " ++ show right
   show (FloatUnary operation destination value) =
     show destination ++ " = " ++ show operation ++ " " ++ show value
+  show (MakeComplex64 destination magnitude phase) =
+    show destination ++ " = polar " ++ show magnitude ++ " " ++ show phase
+  show (RealToComplex64 destination value) =
+    show destination ++ " = real-to-complex " ++ show value
+  show (ComplexMagnitude destination value) =
+    show destination ++ " = magnitude " ++ show value
+  show (ComplexPhase destination value) =
+    show destination ++ " = phase " ++ show value
+  show (ComplexBinary operation destination left right) =
+    show destination ++ " = " ++ show operation ++
+    " " ++ show left ++ " " ++ show right
+  show (ComplexConjugate destination value) =
+    show destination ++ " = complex-conjugate " ++ show value
 
 ||| One C-callable, closure-free numerical leaf.
 public export
