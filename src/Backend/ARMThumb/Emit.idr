@@ -208,6 +208,40 @@ validate_instruction function (FloatUnary operation destination value) = do
   validate_local_home function value
   expect_representation "Float unary result" Float32 destination
   expect_representation "Float unary operand" Float32 value
+validate_instruction function (MakeComplex64 destination magnitude phase) = do
+  validate_local_home function destination
+  validate_local_home function magnitude
+  validate_local_home function phase
+  expect_representation "Complex64 result" Complex64 destination
+  expect_representation "Complex64 magnitude" Float32 magnitude
+  expect_representation "Complex64 phase" Float32 phase
+validate_instruction function (RealToComplex64 destination value) = do
+  validate_local_home function destination
+  validate_local_home function value
+  expect_representation "real-to-complex result" Complex64 destination
+  expect_representation "real-to-complex operand" Float32 value
+validate_instruction function (ComplexMagnitude destination value) = do
+  validate_local_home function destination
+  validate_local_home function value
+  expect_representation "complex magnitude result" Float32 destination
+  expect_representation "complex magnitude operand" Complex64 value
+validate_instruction function (ComplexPhase destination value) = do
+  validate_local_home function destination
+  validate_local_home function value
+  expect_representation "complex phase result" Float32 destination
+  expect_representation "complex phase operand" Complex64 value
+validate_instruction function (ComplexBinary operation destination left right) = do
+  validate_local_home function destination
+  validate_local_home function left
+  validate_local_home function right
+  expect_representation "complex binary result" Complex64 destination
+  expect_representation "complex binary left operand" Complex64 left
+  expect_representation "complex binary right operand" Complex64 right
+validate_instruction function (ComplexConjugate destination value) = do
+  validate_local_home function destination
+  validate_local_home function value
+  expect_representation "complex conjugate result" Complex64 destination
+  expect_representation "complex conjugate operand" Complex64 value
 
 private
 validate_instructions : LeafFunction -> List Instruction -> Either String ()
