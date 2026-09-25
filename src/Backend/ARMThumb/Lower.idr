@@ -24,19 +24,23 @@ data RawInstruction
   | RawLoadFloat32 Int Int Int
   | RawFloatBinary FloatBinaryOperation Int Int Int
   | RawFloatUnary FloatUnaryOperation Int Int
+  | RawMakeComplex64 Int Int Int
+  | RawRealToComplex64 Int Int
+  | RawComplexMagnitude Int Int
+  | RawComplexPhase Int Int
+  | RawComplexBinary ComplexBinaryOperation Int Int Int
+  | RawComplexConjugate Int Int
 
 private
 record BuildState where
   constructor MkBuildState
   bound_variables : List Int
-  variable_slots : List (Int, Int)
-  next_slot : Int
   raw_instructions_reversed : List RawInstruction
   constraints : List RepresentationConstraint
 
 private
 empty_state : BuildState
-empty_state = MkBuildState [] [] 0 [] []
+empty_state = MkBuildState [] [] []
 
 private
 is_ascii_letter : Char -> Bool
@@ -79,6 +83,12 @@ data RendererPrimitive
   = BufferLoad
   | Binary FloatBinaryOperation
   | Unary FloatUnaryOperation
+  | ComplexFromPolar
+  | RealToComplex
+  | ComplexMagnitudePrimitive
+  | ComplexPhasePrimitive
+  | ComplexBinaryPrimitive ComplexBinaryOperation
+  | ComplexConjugatePrimitive
 
 private
 renderer_primitive : Name -> Maybe RendererPrimitive
@@ -99,40 +109,52 @@ renderer_primitive name =
                 then Just (Unary AbsoluteFloat32)
                 else if name == renderer_name "float32_square_root"
                   then Just (Unary SquareRootFloat32)
-                  else Nothing
+                  else if name == renderer_name "complex64_from_polar"
+                    then Just ComplexFromPolar
+                    else if name == renderer_name "float32_to_complex64"
+                      then Just RealToComplex
+                      else if name == renderer_name "complex64_magnitude"
+                        then Just ComplexMagnitudePrimitive
+                        else if name == renderer_name "complex64_phase"
+                          then Just ComplexPhasePrimitive
+                          else if name == renderer_name "complex64_multiply"
+                            then Just (ComplexBinaryPrimitive MultiplyComplex64)
+                            else if name == renderer_name "complex64_divide"
+                              then Just (ComplexBinaryPrimitive DivideComplex64)
+                              else if name == renderer_name "complex64_conjugate"
+                                then Just ComplexConjugatePrimitive
+                                else Nothing
 
 private
 add_constraint : RepresentationConstraint -> BuildState -> BuildState
 add_constraint constraint
-               (MkBuildState bound slots next instructions constraints) =
-  MkBuildState bound slots next instructions (constraint :: constraints)
+               (MkBuildState bound instructions constraints) =
+  MkBuildState bound instructions (constraint :: constraints)
 
 private
 add_instruction : RawInstruction -> BuildState -> BuildState
 add_instruction instruction
-                (MkBuildState bound slots next instructions constraints) =
-  MkBuildState bound slots next (instruction :: instructions) constraints
+                (MkBuildState bound instructions constraints) =
+  MkBuildState bound (instruction :: instructions) constraints
 
 private
 bind_variable : String -> Int -> BuildState -> Either String BuildState
 bind_variable role variable
-              (MkBuildState bound slots next instructions constraints) =
+              (MkBuildState bound instructions constraints) =
   if elem variable bound
     then
       Left
         (role ++ " v" ++ show variable ++
          " is already defined in this numerical leaf")
-    else if next >= max_locals
+    else if cast (length bound) >= max_locals
       then
         Left
           ("The numerical leaf needs more than " ++ show max_locals ++
-           " dense four-byte stack homes")
+           " locals")
       else
         Right
           (MkBuildState
             (variable :: bound)
-            ((variable, next) :: slots)
-            (next + 1)
             instructions
             constraints)
 
