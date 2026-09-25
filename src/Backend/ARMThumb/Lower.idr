@@ -221,6 +221,51 @@ add_float_unary operation destination value state =
       (add_constraint (HasRepresentation value Float32) state))
 
 private
+add_make_complex64 : Int -> Int -> Int -> BuildState -> BuildState
+add_make_complex64 destination magnitude phase state =
+  add_instruction (RawMakeComplex64 destination magnitude phase)
+    (add_constraint (HasRepresentation destination Complex64)
+      (add_constraint (HasRepresentation magnitude Float32)
+        (add_constraint (HasRepresentation phase Float32) state)))
+
+private
+add_real_to_complex64 : Int -> Int -> BuildState -> BuildState
+add_real_to_complex64 destination value state =
+  add_instruction (RawRealToComplex64 destination value)
+    (add_constraint (HasRepresentation destination Complex64)
+      (add_constraint (HasRepresentation value Float32) state))
+
+private
+add_complex_magnitude : Int -> Int -> BuildState -> BuildState
+add_complex_magnitude destination value state =
+  add_instruction (RawComplexMagnitude destination value)
+    (add_constraint (HasRepresentation destination Float32)
+      (add_constraint (HasRepresentation value Complex64) state))
+
+private
+add_complex_phase : Int -> Int -> BuildState -> BuildState
+add_complex_phase destination value state =
+  add_instruction (RawComplexPhase destination value)
+    (add_constraint (HasRepresentation destination Float32)
+      (add_constraint (HasRepresentation value Complex64) state))
+
+private
+add_complex_binary :
+  ComplexBinaryOperation -> Int -> Int -> Int -> BuildState -> BuildState
+add_complex_binary operation destination left right state =
+  add_instruction (RawComplexBinary operation destination left right)
+    (add_constraint (HasRepresentation destination Complex64)
+      (add_constraint (HasRepresentation left Complex64)
+        (add_constraint (HasRepresentation right Complex64) state)))
+
+private
+add_complex_conjugate : Int -> Int -> BuildState -> BuildState
+add_complex_conjugate destination value state =
+  add_instruction (RawComplexConjugate destination value)
+    (add_constraint (HasRepresentation destination Complex64)
+      (add_constraint (HasRepresentation value Complex64) state))
+
+private
 lower_external :
   Int -> Name -> List AVar -> BuildState -> Either String BuildState
 lower_external destination name arguments state =
@@ -257,6 +302,68 @@ lower_external destination name arguments state =
           require_bound (show operation ++ " operand") value state
           with_destination <- bind_variable "Let destination" destination state
           Right (add_float_unary operation destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just ComplexFromPolar =>
+      case arguments of
+        [ALocal magnitude, ALocal phase] => do
+          require_bound "Complex64 magnitude" magnitude state
+          require_bound "Complex64 phase" phase state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_make_complex64 destination magnitude phase with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires two local operands, got " ++ show arguments)
+    Just RealToComplex =>
+      case arguments of
+        [ALocal value] => do
+          require_bound "Float32 to Complex64 operand" value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_real_to_complex64 destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just ComplexMagnitudePrimitive =>
+      case arguments of
+        [ALocal value] => do
+          require_bound "Complex64 magnitude operand" value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_complex_magnitude destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just ComplexPhasePrimitive =>
+      case arguments of
+        [ALocal value] => do
+          require_bound "Complex64 phase operand" value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_complex_phase destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just (ComplexBinaryPrimitive operation) =>
+      case arguments of
+        [ALocal left, ALocal right] => do
+          require_bound (show operation ++ " left operand") left state
+          require_bound (show operation ++ " right operand") right state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_complex_binary operation destination left right with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires two local operands, got " ++ show arguments)
+    Just ComplexConjugatePrimitive =>
+      case arguments of
+        [ALocal value] => do
+          require_bound "Complex64 conjugate operand" value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_complex_conjugate destination value with_destination)
         _ =>
           Left
             ("Renderer primitive `" ++ show name ++
