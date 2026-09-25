@@ -7,9 +7,13 @@ import Data.String
 %default total
 
 private
+slot_address_at : Local -> Int -> String
+slot_address_at local component =
+  "[sp, #" ++ show ((local.frame_slot + component) * 4) ++ "]"
+
+private
 slot_address : Local -> String
-slot_address local =
-  "[sp, #" ++ show (local.frame_slot * 4) ++ "]"
+slot_address local = slot_address_at local 0
 
 private
 load_word : String -> Local -> List String
@@ -58,7 +62,14 @@ float_unary_mnemonic SquareRootFloat32 = "vsqrt.f32"
 private
 emit_instruction : Instruction -> List String
 emit_instruction (Copy destination source) =
-  load_word "r0" source ++ store_word "r0" destination
+  case destination.representation of
+    Complex64 =>
+      [ "        ldr     r0, " ++ slot_address_at source 0
+      , "        str     r0, " ++ slot_address_at destination 0
+      , "        ldr     r0, " ++ slot_address_at source 1
+      , "        str     r0, " ++ slot_address_at destination 1
+      ]
+    _ => load_word "r0" source ++ store_word "r0" destination
 emit_instruction (WordConstant destination value) =
   materialise_word32 value ++ store_word "r0" destination
 emit_instruction (LoadFloat32 destination buffer index) =
@@ -77,6 +88,56 @@ emit_instruction (FloatUnary operation destination value) =
   load_float "s0" value ++
   [ "        " ++ float_unary_mnemonic operation ++ " s0, s0" ] ++
   store_float "s0" destination
+emit_instruction (MakeComplex64 destination magnitude phase) =
+  load_word "r0" magnitude ++
+  [ "        str     r0, " ++ slot_address_at destination 0 ] ++
+  load_word "r0" phase ++
+  [ "        str     r0, " ++ slot_address_at destination 1 ]
+emit_instruction (RealToComplex64 destination value) =
+  load_word "r0" value ++
+  [ "        lsls    r1, r0, #1"
+  , "        lsrs    r1, r1, #1"
+  , "        str     r1, " ++ slot_address_at destination 0
+  , "        movw    r1, #4059"
+  , "        movt    r1, #16457"
+  , "        cmp     r0, #0"
+  , "        it      pl"
+  , "        movpl   r1, #0"
+  , "        str     r1, " ++ slot_address_at destination 1
+  ]
+emit_instruction (ComplexMagnitude destination value) =
+  [ "        ldr     r0, " ++ slot_address_at value 0
+  , "        str     r0, " ++ slot_address destination
+  ]
+emit_instruction (ComplexPhase destination value) =
+  [ "        ldr     r0, " ++ slot_address_at value 1
+  , "        str     r0, " ++ slot_address destination
+  ]
+emit_instruction (ComplexBinary operation destination left right) =
+  [ "        vldr    s0, " ++ slot_address_at left 0
+  , "        vldr    s1, " ++ slot_address_at right 0
+  , "        " ++
+      (case operation of
+        MultiplyComplex64 => "vmul.f32"
+        DivideComplex64 => "vdiv.f32") ++
+      " s0, s0, s1"
+  , "        vstr    s0, " ++ slot_address_at destination 0
+  , "        vldr    s2, " ++ slot_address_at left 1
+  , "        vldr    s3, " ++ slot_address_at right 1
+  , "        " ++
+      (case operation of
+        MultiplyComplex64 => "vadd.f32"
+        DivideComplex64 => "vsub.f32") ++
+      " s2, s2, s3"
+  , "        vstr    s2, " ++ slot_address_at destination 1
+  ]
+emit_instruction (ComplexConjugate destination value) =
+  [ "        ldr     r0, " ++ slot_address_at value 0
+  , "        str     r0, " ++ slot_address_at destination 0
+  , "        vldr    s0, " ++ slot_address_at value 1
+  , "        vneg.f32 s0, s0"
+  , "        vstr    s0, " ++ slot_address_at destination 1
+  ]
 
 private
 emit_instructions : List Instruction -> List String
@@ -105,7 +166,9 @@ expect_representation role expected local =
 private
 validate_local_home : LeafFunction -> Local -> Either String ()
 validate_local_home function local =
-  if local.frame_slot < 0 || local.frame_slot * 4 + 4 > function.frame_bytes
+  if local.frame_slot < 0 ||
+     local.frame_slot * 4 + representation_slots local.representation * 4 >
+       function.frame_bytes
     then
       Left
         ("Local " ++ show local ++ " is outside the " ++
