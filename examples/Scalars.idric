@@ -180,5 +180,22 @@ e5m3_to_f32_test value = RendererPrimitives.e5m3_to_float32 value
 f32_to_e5m3_test : Float32 -> E5M3
 f32_to_e5m3_test value = RendererPrimitives.float32_to_e5m3 value
 
+
+%export "arm-thumb:float16_source_add_test"
+float16_source_add_test : Float16 -> Float16 -> Float16
+float16_source_add_test left right = left + right
+
+%export "arm-thumb:e4m3_source_add_test"
+e4m3_source_add_test : E4M3 -> E4M3 -> E4M3
+e4m3_source_add_test left right = left + right
+
+%export "arm-thumb:e5m2_source_add_test"
+e5m2_source_add_test : E5M2 -> E5M2 -> E5M2
+e5m2_source_add_test left right = left + right
+
+%export "arm-thumb:e3m2_source_add_test"
+e3m2_source_add_test : E3M2 -> E3M2 -> E3M2
+e3m2_source_add_test left right = left + right
+
 main : IO ()
 main = pure ()
