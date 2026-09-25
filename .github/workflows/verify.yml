@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: isomorphisms/Idric
-          ref: 081b9cde0591154839fb5d80d76e5570e0436300
+          ref: ca6b88b370409567dcaff0db6c53f15fa2e5d8fb
           path: Idric
 
       - name: Install host build tools
