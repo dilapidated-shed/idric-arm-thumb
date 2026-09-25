@@ -1,5 +1,5 @@
 IDRIC ?= idris2
-IDRIC_REVISION ?= 081b9cde0
+IDRIC_REVISION ?= ad674be3e
 ARM_CLANG ?= clang
 ARM_TARGET ?= armv7a-linux-androideabi21
 ARM_EXEC_TARGET ?= armv7a-linux-gnueabihf
@@ -113,6 +113,10 @@ inspect: examples
 	grep -q '^e4m3_add_test:' $(SCALARS_ASSEMBLY)
 	grep -q '^e5m2_add_test:' $(SCALARS_ASSEMBLY)
 	grep -q '^e3m2_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^float16_source_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^e4m3_source_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^e5m2_source_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^e3m2_source_add_test:' $(SCALARS_ASSEMBLY)
 	grep -q '^e5m3_to_f32_test:' $(SCALARS_ASSEMBLY)
 	grep -q '^\.Lscalar_decode_generic:' $(SCALARS_ASSEMBLY)
 	grep -q '^\.Lscalar_encode_generic:' $(SCALARS_ASSEMBLY)

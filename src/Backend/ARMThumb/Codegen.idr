@@ -28,9 +28,21 @@ record ExportABI where
   result_representation : Representation
 
 private
+type_name : String -> String -> Name
+type_name namespace leaf =
+  NS (mkNamespace namespace) (UN (Basic leaf))
+
+private
 renderer_type_name : String -> Name
-renderer_type_name leaf =
-  NS (mkNamespace "RendererPrimitives") (UN (Basic leaf))
+renderer_type_name = type_name "RendererPrimitives"
+
+private
+float16_type_name : Name
+float16_type_name = type_name "Prelude.Float16" "Float16"
+
+private
+low_precision_type_name : String -> Name
+low_precision_type_name = type_name "Prelude.LowPrecision"
 
 private
 print_ascii_main_name : Name
@@ -46,15 +58,15 @@ classify_abi_type (PrimVal _ (PrT primitive_type)) =
 classify_abi_type (Ref _ (TyCon 0) name) =
   if name == renderer_type_name "Float32"
     then Right Float32
-  else if name == renderer_type_name "Float16"
+  else if name == float16_type_name
     then Right Float16Value
-  else if name == renderer_type_name "E4M3"
+  else if name == low_precision_type_name "E4M3"
     then Right E4M3Value
-  else if name == renderer_type_name "E5M2"
+  else if name == low_precision_type_name "E5M2"
     then Right E5M2Value
-  else if name == renderer_type_name "E3M2"
+  else if name == low_precision_type_name "E3M2"
     then Right E3M2Value
-  else if name == renderer_type_name "E5M3"
+  else if name == low_precision_type_name "E5M3"
     then Right E5M3Value
   else if name == renderer_type_name "Float32Buffer"
     then Right Float32Pointer
