@@ -1,5 +1,5 @@
 IDRIC ?= idris2
-IDRIC_REVISION ?= ca6b88b37
+IDRIC_REVISION ?= ad674be3e
 ARM_CLANG ?= clang
 ARM_TARGET ?= armv7a-linux-androideabi21
 ARM_EXEC_TARGET ?= armv7a-linux-gnueabihf
