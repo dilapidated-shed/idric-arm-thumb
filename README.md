@@ -8,7 +8,7 @@ Direct ARMv7 Thumb-2/VFP backend for Idriç, without routing numerical leaves th
 
 `main` intentionally remains the separate direct-DEX line. Advancing native ARM/Thumb does not require merging this line into DEX.
 
-The first slice is deliberately small. It compiles an exported, closure-free function whose arguments and result are `RendererPrimitives.Float32` and whose body is made from local copies, Float32 addition, and Float32 multiplication.
+The active numerical slice remains a closure-free Float32 C ABI, but it now also admits **internal polar `Complex64` values**: two Float32 words `(magnitude, phase)`. Complex64 is deliberately not exported across the C ABI yet; exported arguments and results remain the already-qualified one-word forms.
 
 ```text
 .idric source
@@ -44,6 +44,7 @@ That compiler deliberately remains implemented on the current Idris 2 internals,
 - softfp C boundary: up to four Float32 words enter through `r0`-`r3`; the Float32 result leaves as raw bits in `r0`
 - 8-byte-aligned stack frame
 - no heap, GC, closures, or Idris runtime in the emitted numerical leaf
+- internal `Complex64` is two Float32 stack words in polar order: magnitude, phase
 
 ## Build and verify
 
@@ -65,14 +66,20 @@ Accepted now:
 - zero to four explicit `Float32` arguments
 - `Float32` result
 - local copies
-- `float32_add`
-- `float32_multiply`
+- Float32 add/subtract/multiply/divide/negate/abs/sqrt
+- caller-owned Float32 buffer loads
+- internal polar `Complex64`
+- Float32 -> Complex64 lift: negative finite reals become `(|x|, pi)`, nonnegative finite reals become `(x, 0)`
+- explicit polar construction
+- Complex64 magnitude/phase extraction
+- Complex64 multiply/divide/conjugate
 
 Rejected now:
 
-- integers and Float32 constants
-- buffers and loads
-- subtract/divide/negate/abs/sqrt
+- Complex64 as an exported C argument or result
+- complex addition/subtraction (needs a deliberate trig/libm or alternate lowering)
+- Complex32 arithmetic
+- Float64/Complex128 as a prerequisite for this ARMv7 path
 - branches and comparisons
 - recursion or general calls
 - constructors, closures, allocation, strings, IO, JNI, or Android lifecycle code
@@ -82,3 +89,19 @@ The older `idris-arm-backend` remains useful reference code for the broader arit
 ## Next slice
 
 After this affine path is green: bring back the remaining proven Float32 operations and caller-owned `Float32Buffer` loads, then add comparisons and a constrained tail loop for Horner evaluation.
+
+
+## Why Complex64, not Float64
+
+On this ARMv7/VFPv3-D16 target the existing arithmetic path is native Float32.
+
+The naming is therefore:
+
+```text
+Float32 + Float32 polar pair -> Complex64
+Float16 + Float16 polar pair -> Complex32
+```
+
+Complex64 is the first arithmetic complex type because it uses the already-qualified Float32 operations. Complex32 remains a useful later storage format, but binary16 arithmetic should promote to Float32 rather than pretending this VFPv3-D16 target has native Float16 arithmetic.
+
+The Pauli renderer is the immediate consumer motivating this slice.

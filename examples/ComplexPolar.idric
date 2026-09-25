@@ -1,0 +1,59 @@
+module ComplexPolar
+
+import RendererPrimitives
+
+%export "arm-thumb:complex64_real_magnitude"
+complex64_real_magnitude : Float32 -> Float32
+complex64_real_magnitude value =
+  complex64_magnitude (float32_to_complex64 value)
+
+%export "arm-thumb:complex64_real_phase"
+complex64_real_phase : Float32 -> Float32
+complex64_real_phase value =
+  complex64_phase (float32_to_complex64 value)
+
+%export "arm-thumb:complex64_mul_magnitude"
+complex64_mul_magnitude :
+  Float32 -> Float32 -> Float32 -> Float32 -> Float32
+complex64_mul_magnitude left_magnitude left_phase right_magnitude right_phase =
+  complex64_magnitude
+    (complex64_multiply
+      (complex64_from_polar left_magnitude left_phase)
+      (complex64_from_polar right_magnitude right_phase))
+
+%export "arm-thumb:complex64_mul_phase"
+complex64_mul_phase :
+  Float32 -> Float32 -> Float32 -> Float32 -> Float32
+complex64_mul_phase left_magnitude left_phase right_magnitude right_phase =
+  complex64_phase
+    (complex64_multiply
+      (complex64_from_polar left_magnitude left_phase)
+      (complex64_from_polar right_magnitude right_phase))
+
+%export "arm-thumb:complex64_div_magnitude"
+complex64_div_magnitude :
+  Float32 -> Float32 -> Float32 -> Float32 -> Float32
+complex64_div_magnitude left_magnitude left_phase right_magnitude right_phase =
+  complex64_magnitude
+    (complex64_divide
+      (complex64_from_polar left_magnitude left_phase)
+      (complex64_from_polar right_magnitude right_phase))
+
+%export "arm-thumb:complex64_div_phase"
+complex64_div_phase :
+  Float32 -> Float32 -> Float32 -> Float32 -> Float32
+complex64_div_phase left_magnitude left_phase right_magnitude right_phase =
+  complex64_phase
+    (complex64_divide
+      (complex64_from_polar left_magnitude left_phase)
+      (complex64_from_polar right_magnitude right_phase))
+
+%export "arm-thumb:complex64_conjugate_phase"
+complex64_conjugate_phase : Float32 -> Float32 -> Float32
+complex64_conjugate_phase magnitude phase =
+  complex64_phase
+    (complex64_conjugate
+      (complex64_from_polar magnitude phase))
+
+main : IO ()
+main = pure ()

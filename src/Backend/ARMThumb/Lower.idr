@@ -24,19 +24,23 @@ data RawInstruction
   | RawLoadFloat32 Int Int Int
   | RawFloatBinary FloatBinaryOperation Int Int Int
   | RawFloatUnary FloatUnaryOperation Int Int
+  | RawMakeComplex64 Int Int Int
+  | RawRealToComplex64 Int Int
+  | RawComplexMagnitude Int Int
+  | RawComplexPhase Int Int
+  | RawComplexBinary ComplexBinaryOperation Int Int Int
+  | RawComplexConjugate Int Int
 
 private
 record BuildState where
   constructor MkBuildState
   bound_variables : List Int
-  variable_slots : List (Int, Int)
-  next_slot : Int
   raw_instructions_reversed : List RawInstruction
   constraints : List RepresentationConstraint
 
 private
 empty_state : BuildState
-empty_state = MkBuildState [] [] 0 [] []
+empty_state = MkBuildState [] [] []
 
 private
 is_ascii_letter : Char -> Bool
@@ -79,6 +83,12 @@ data RendererPrimitive
   = BufferLoad
   | Binary FloatBinaryOperation
   | Unary FloatUnaryOperation
+  | ComplexFromPolar
+  | RealToComplex
+  | ComplexMagnitudePrimitive
+  | ComplexPhasePrimitive
+  | ComplexBinaryPrimitive ComplexBinaryOperation
+  | ComplexConjugatePrimitive
 
 private
 renderer_primitive : Name -> Maybe RendererPrimitive
@@ -99,40 +109,52 @@ renderer_primitive name =
                 then Just (Unary AbsoluteFloat32)
                 else if name == renderer_name "float32_square_root"
                   then Just (Unary SquareRootFloat32)
-                  else Nothing
+                  else if name == renderer_name "complex64_from_polar"
+                    then Just ComplexFromPolar
+                    else if name == renderer_name "float32_to_complex64"
+                      then Just RealToComplex
+                      else if name == renderer_name "complex64_magnitude"
+                        then Just ComplexMagnitudePrimitive
+                        else if name == renderer_name "complex64_phase"
+                          then Just ComplexPhasePrimitive
+                          else if name == renderer_name "complex64_multiply"
+                            then Just (ComplexBinaryPrimitive MultiplyComplex64)
+                            else if name == renderer_name "complex64_divide"
+                              then Just (ComplexBinaryPrimitive DivideComplex64)
+                              else if name == renderer_name "complex64_conjugate"
+                                then Just ComplexConjugatePrimitive
+                                else Nothing
 
 private
 add_constraint : RepresentationConstraint -> BuildState -> BuildState
 add_constraint constraint
-               (MkBuildState bound slots next instructions constraints) =
-  MkBuildState bound slots next instructions (constraint :: constraints)
+               (MkBuildState bound instructions constraints) =
+  MkBuildState bound instructions (constraint :: constraints)
 
 private
 add_instruction : RawInstruction -> BuildState -> BuildState
 add_instruction instruction
-                (MkBuildState bound slots next instructions constraints) =
-  MkBuildState bound slots next (instruction :: instructions) constraints
+                (MkBuildState bound instructions constraints) =
+  MkBuildState bound (instruction :: instructions) constraints
 
 private
 bind_variable : String -> Int -> BuildState -> Either String BuildState
 bind_variable role variable
-              (MkBuildState bound slots next instructions constraints) =
+              (MkBuildState bound instructions constraints) =
   if elem variable bound
     then
       Left
         (role ++ " v" ++ show variable ++
          " is already defined in this numerical leaf")
-    else if next >= max_locals
+    else if cast (length bound) >= max_locals
       then
         Left
           ("The numerical leaf needs more than " ++ show max_locals ++
-           " dense four-byte stack homes")
+           " locals")
       else
         Right
           (MkBuildState
             (variable :: bound)
-            ((variable, next) :: slots)
-            (next + 1)
             instructions
             constraints)
 
@@ -199,6 +221,51 @@ add_float_unary operation destination value state =
       (add_constraint (HasRepresentation value Float32) state))
 
 private
+add_make_complex64 : Int -> Int -> Int -> BuildState -> BuildState
+add_make_complex64 destination magnitude phase state =
+  add_instruction (RawMakeComplex64 destination magnitude phase)
+    (add_constraint (HasRepresentation destination Complex64)
+      (add_constraint (HasRepresentation magnitude Float32)
+        (add_constraint (HasRepresentation phase Float32) state)))
+
+private
+add_real_to_complex64 : Int -> Int -> BuildState -> BuildState
+add_real_to_complex64 destination value state =
+  add_instruction (RawRealToComplex64 destination value)
+    (add_constraint (HasRepresentation destination Complex64)
+      (add_constraint (HasRepresentation value Float32) state))
+
+private
+add_complex_magnitude : Int -> Int -> BuildState -> BuildState
+add_complex_magnitude destination value state =
+  add_instruction (RawComplexMagnitude destination value)
+    (add_constraint (HasRepresentation destination Float32)
+      (add_constraint (HasRepresentation value Complex64) state))
+
+private
+add_complex_phase : Int -> Int -> BuildState -> BuildState
+add_complex_phase destination value state =
+  add_instruction (RawComplexPhase destination value)
+    (add_constraint (HasRepresentation destination Float32)
+      (add_constraint (HasRepresentation value Complex64) state))
+
+private
+add_complex_binary :
+  ComplexBinaryOperation -> Int -> Int -> Int -> BuildState -> BuildState
+add_complex_binary operation destination left right state =
+  add_instruction (RawComplexBinary operation destination left right)
+    (add_constraint (HasRepresentation destination Complex64)
+      (add_constraint (HasRepresentation left Complex64)
+        (add_constraint (HasRepresentation right Complex64) state)))
+
+private
+add_complex_conjugate : Int -> Int -> BuildState -> BuildState
+add_complex_conjugate destination value state =
+  add_instruction (RawComplexConjugate destination value)
+    (add_constraint (HasRepresentation destination Complex64)
+      (add_constraint (HasRepresentation value Complex64) state))
+
+private
 lower_external :
   Int -> Name -> List AVar -> BuildState -> Either String BuildState
 lower_external destination name arguments state =
@@ -235,6 +302,68 @@ lower_external destination name arguments state =
           require_bound (show operation ++ " operand") value state
           with_destination <- bind_variable "Let destination" destination state
           Right (add_float_unary operation destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just ComplexFromPolar =>
+      case arguments of
+        [ALocal magnitude, ALocal phase] => do
+          require_bound "Complex64 magnitude" magnitude state
+          require_bound "Complex64 phase" phase state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_make_complex64 destination magnitude phase with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires two local operands, got " ++ show arguments)
+    Just RealToComplex =>
+      case arguments of
+        [ALocal value] => do
+          require_bound "Float32 to Complex64 operand" value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_real_to_complex64 destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just ComplexMagnitudePrimitive =>
+      case arguments of
+        [ALocal value] => do
+          require_bound "Complex64 magnitude operand" value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_complex_magnitude destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just ComplexPhasePrimitive =>
+      case arguments of
+        [ALocal value] => do
+          require_bound "Complex64 phase operand" value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_complex_phase destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just (ComplexBinaryPrimitive operation) =>
+      case arguments of
+        [ALocal left, ALocal right] => do
+          require_bound (show operation ++ " left operand") left state
+          require_bound (show operation ++ " right operand") right state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_complex_binary operation destination left right with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires two local operands, got " ++ show arguments)
+    Just ComplexConjugatePrimitive =>
+      case arguments of
+        [ALocal value] => do
+          require_bound "Complex64 conjugate operand" value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_complex_conjugate destination value with_destination)
         _ =>
           Left
             ("Renderer primitive `" ++ show name ++
@@ -340,18 +469,26 @@ infer_representation constraints variable =
          " has conflicting representations: " ++ show representations)
 
 private
-find_slot : Int -> List (Int, Int) -> Either String Int
-find_slot variable [] = Left ("Internal error: no dense frame slot for v" ++ show variable)
-find_slot variable ((candidate, slot) :: rest) =
-  if variable == candidate then Right slot else find_slot variable rest
+allocate_locals :
+  List RepresentationConstraint -> List Int -> Int -> List (Int, Local) ->
+  Either String (List (Int, Local), Int)
+allocate_locals constraints [] next accumulated =
+  Right (reverse accumulated, next)
+allocate_locals constraints (variable :: rest) next accumulated = do
+  representation <- infer_representation constraints variable
+  let local = MkLocal variable next representation
+  allocate_locals
+    constraints
+    rest
+    (next + representation_slots representation)
+    ((variable, local) :: accumulated)
 
 private
-resolve_local :
-  List (Int, Int) -> List RepresentationConstraint -> Int -> Either String Local
-resolve_local slots constraints variable = do
-  slot <- find_slot variable slots
-  representation <- infer_representation constraints variable
-  Right (MkLocal variable slot representation)
+find_local : Int -> List (Int, Local) -> Either String Local
+find_local variable [] =
+  Left ("Internal error: no dense frame home for v" ++ show variable)
+find_local variable ((candidate, local) :: rest) =
+  if variable == candidate then Right local else find_local variable rest
 
 private
 expect_representation : String -> Representation -> Local -> Either String ()
@@ -365,59 +502,96 @@ expect_representation role expected local =
 
 private
 resolve_instruction :
-  List (Int, Int) -> List RepresentationConstraint -> RawInstruction ->
-  Either String Instruction
-resolve_instruction slots constraints (RawCopy destination source) = do
-  destination_local <- resolve_local slots constraints destination
-  source_local <- resolve_local slots constraints source
+  List (Int, Local) -> RawInstruction -> Either String Instruction
+resolve_instruction locals (RawCopy destination source) = do
+  destination_local <- find_local destination locals
+  source_local <- find_local source locals
   if destination_local.representation == source_local.representation
     then Right (Copy destination_local source_local)
     else Left "Internal error: copy representation constraint was not solved"
-resolve_instruction slots constraints (RawWordConstant destination value) = do
-  destination_local <- resolve_local slots constraints destination
+resolve_instruction locals (RawWordConstant destination value) = do
+  destination_local <- find_local destination locals
   expect_representation "Word constant" Word32 destination_local
   Right (WordConstant destination_local value)
-resolve_instruction slots constraints (RawLoadFloat32 destination buffer index) = do
-  destination_local <- resolve_local slots constraints destination
-  buffer_local <- resolve_local slots constraints buffer
-  index_local <- resolve_local slots constraints index
+resolve_instruction locals (RawLoadFloat32 destination buffer index) = do
+  destination_local <- find_local destination locals
+  buffer_local <- find_local buffer locals
+  index_local <- find_local index locals
   expect_representation "Buffer load result" Float32 destination_local
   expect_representation "Buffer load pointer" Float32Pointer buffer_local
   expect_representation "Buffer load index" Word32 index_local
   Right (LoadFloat32 destination_local buffer_local index_local)
-resolve_instruction slots constraints (RawFloatBinary operation destination left right) = do
-  destination_local <- resolve_local slots constraints destination
-  left_local <- resolve_local slots constraints left
-  right_local <- resolve_local slots constraints right
+resolve_instruction locals (RawFloatBinary operation destination left right) = do
+  destination_local <- find_local destination locals
+  left_local <- find_local left locals
+  right_local <- find_local right locals
   expect_representation "Float binary result" Float32 destination_local
   expect_representation "Float binary left operand" Float32 left_local
   expect_representation "Float binary right operand" Float32 right_local
   Right (FloatBinary operation destination_local left_local right_local)
-resolve_instruction slots constraints (RawFloatUnary operation destination value) = do
-  destination_local <- resolve_local slots constraints destination
-  value_local <- resolve_local slots constraints value
+resolve_instruction locals (RawFloatUnary operation destination value) = do
+  destination_local <- find_local destination locals
+  value_local <- find_local value locals
   expect_representation "Float unary result" Float32 destination_local
   expect_representation "Float unary operand" Float32 value_local
   Right (FloatUnary operation destination_local value_local)
+resolve_instruction locals (RawMakeComplex64 destination magnitude phase) = do
+  destination_local <- find_local destination locals
+  magnitude_local <- find_local magnitude locals
+  phase_local <- find_local phase locals
+  expect_representation "Complex64 result" Complex64 destination_local
+  expect_representation "Complex64 magnitude" Float32 magnitude_local
+  expect_representation "Complex64 phase" Float32 phase_local
+  Right (MakeComplex64 destination_local magnitude_local phase_local)
+resolve_instruction locals (RawRealToComplex64 destination value) = do
+  destination_local <- find_local destination locals
+  value_local <- find_local value locals
+  expect_representation "real-to-complex result" Complex64 destination_local
+  expect_representation "real-to-complex operand" Float32 value_local
+  Right (RealToComplex64 destination_local value_local)
+resolve_instruction locals (RawComplexMagnitude destination value) = do
+  destination_local <- find_local destination locals
+  value_local <- find_local value locals
+  expect_representation "complex magnitude result" Float32 destination_local
+  expect_representation "complex magnitude operand" Complex64 value_local
+  Right (ComplexMagnitude destination_local value_local)
+resolve_instruction locals (RawComplexPhase destination value) = do
+  destination_local <- find_local destination locals
+  value_local <- find_local value locals
+  expect_representation "complex phase result" Float32 destination_local
+  expect_representation "complex phase operand" Complex64 value_local
+  Right (ComplexPhase destination_local value_local)
+resolve_instruction locals (RawComplexBinary operation destination left right) = do
+  destination_local <- find_local destination locals
+  left_local <- find_local left locals
+  right_local <- find_local right locals
+  expect_representation "complex binary result" Complex64 destination_local
+  expect_representation "complex binary left operand" Complex64 left_local
+  expect_representation "complex binary right operand" Complex64 right_local
+  Right (ComplexBinary operation destination_local left_local right_local)
+resolve_instruction locals (RawComplexConjugate destination value) = do
+  destination_local <- find_local destination locals
+  value_local <- find_local value locals
+  expect_representation "complex conjugate result" Complex64 destination_local
+  expect_representation "complex conjugate operand" Complex64 value_local
+  Right (ComplexConjugate destination_local value_local)
 
 private
 resolve_instructions :
-  List (Int, Int) -> List RepresentationConstraint -> List RawInstruction ->
-  Either String (List Instruction)
-resolve_instructions slots constraints [] = Right []
-resolve_instructions slots constraints (instruction :: rest) = do
-  resolved <- resolve_instruction slots constraints instruction
-  more <- resolve_instructions slots constraints rest
+  List (Int, Local) -> List RawInstruction -> Either String (List Instruction)
+resolve_instructions locals [] = Right []
+resolve_instructions locals (instruction :: rest) = do
+  resolved <- resolve_instruction locals instruction
+  more <- resolve_instructions locals rest
   Right (resolved :: more)
 
 private
 resolve_locals :
-  List (Int, Int) -> List RepresentationConstraint -> List Int ->
-  Either String (List Local)
-resolve_locals slots constraints [] = Right []
-resolve_locals slots constraints (variable :: rest) = do
-  local <- resolve_local slots constraints variable
-  more <- resolve_locals slots constraints rest
+  List (Int, Local) -> List Int -> Either String (List Local)
+resolve_locals locals [] = Right []
+resolve_locals locals (variable :: rest) = do
+  local <- find_local variable locals
+  more <- resolve_locals locals rest
   Right (local :: more)
 
 private
@@ -432,15 +606,16 @@ resolve_function :
   String -> List Int -> Int -> Representation -> BuildState ->
   Either String LeafFunction
 resolve_function symbol argument_variables result_variable result_representation state = do
-  arguments <- resolve_locals state.variable_slots state.constraints argument_variables
+  (locals, next_slot) <-
+    allocate_locals state.constraints (reverse state.bound_variables) 0 []
+  arguments <- resolve_locals locals argument_variables
   instructions <-
-    resolve_instructions state.variable_slots state.constraints
-      (reverse state.raw_instructions_reversed)
-  result <- resolve_local state.variable_slots state.constraints result_variable
+    resolve_instructions locals (reverse state.raw_instructions_reversed)
+  result <- find_local result_variable locals
   expect_representation "Function result" result_representation result
   Right
     (MkLeafFunction symbol arguments instructions result
-      (aligned_frame_bytes state.next_slot))
+      (aligned_frame_bytes next_slot))
 
 ||| Validate and lower one exported ANF function into representation-tagged IR.
 public export

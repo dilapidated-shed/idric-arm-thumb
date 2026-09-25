@@ -140,6 +140,71 @@ _start:
         cmp     r0, r1
         bne     fail_edge_load
 
+        @ Polar Complex64 real lift: -2 -> (2, pi).
+        ldr     r0, =0xc0000000
+        bl      complex64_real_magnitude
+        ldr     r1, =0x40000000
+        cmp     r0, r1
+        bne     fail_complex_real_magnitude
+
+        ldr     r0, =0xc0000000
+        bl      complex64_real_phase
+        ldr     r1, =0x40490fdb
+        cmp     r0, r1
+        bne     fail_complex_real_phase_negative
+
+        @ Positive real values carry phase zero.
+        ldr     r0, =0x40000000
+        bl      complex64_real_phase
+        cmp     r0, #0
+        bne     fail_complex_real_phase_positive
+
+        @ (2, 0.5) * (3, 1.0) = (6, 1.5).
+        ldr     r0, =0x40000000
+        ldr     r1, =0x3f000000
+        ldr     r2, =0x40400000
+        ldr     r3, =0x3f800000
+        bl      complex64_mul_magnitude
+        ldr     r1, =0x40c00000
+        cmp     r0, r1
+        bne     fail_complex_mul_magnitude
+
+        ldr     r0, =0x40000000
+        ldr     r1, =0x3f000000
+        ldr     r2, =0x40400000
+        ldr     r3, =0x3f800000
+        bl      complex64_mul_phase
+        ldr     r1, =0x3fc00000
+        cmp     r0, r1
+        bne     fail_complex_mul_phase
+
+        @ (6, 1.5) / (3, 0.5) = (2, 1.0).
+        ldr     r0, =0x40c00000
+        ldr     r1, =0x3fc00000
+        ldr     r2, =0x40400000
+        ldr     r3, =0x3f000000
+        bl      complex64_div_magnitude
+        ldr     r1, =0x40000000
+        cmp     r0, r1
+        bne     fail_complex_div_magnitude
+
+        ldr     r0, =0x40c00000
+        ldr     r1, =0x3fc00000
+        ldr     r2, =0x40400000
+        ldr     r3, =0x3f000000
+        bl      complex64_div_phase
+        ldr     r1, =0x3f800000
+        cmp     r0, r1
+        bne     fail_complex_div_phase
+
+        @ conjugate(2, 1.5) = (2, -1.5).
+        ldr     r0, =0x40000000
+        ldr     r1, =0x3fc00000
+        bl      complex64_conjugate_phase
+        ldr     r1, =0xbfc00000
+        cmp     r0, r1
+        bne     fail_complex_conjugate_phase
+
         movs    r0, #0
         b       exit
 
@@ -193,6 +258,30 @@ fail_negative_div:
         b       exit
 fail_edge_load:
         movs    r0, #17
+        b       exit
+fail_complex_real_magnitude:
+        movs    r0, #18
+        b       exit
+fail_complex_real_phase_negative:
+        movs    r0, #19
+        b       exit
+fail_complex_real_phase_positive:
+        movs    r0, #20
+        b       exit
+fail_complex_mul_magnitude:
+        movs    r0, #21
+        b       exit
+fail_complex_mul_phase:
+        movs    r0, #22
+        b       exit
+fail_complex_div_magnitude:
+        movs    r0, #23
+        b       exit
+fail_complex_div_phase:
+        movs    r0, #24
+        b       exit
+fail_complex_conjugate_phase:
+        movs    r0, #25
 
 exit:
         movs    r7, #1
