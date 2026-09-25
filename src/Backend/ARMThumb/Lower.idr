@@ -76,21 +76,21 @@ validate_external_symbol symbol =
         else Left ("Invalid C-compatible ARM symbol `" ++ symbol ++ "`")
 
 private
-qualified_name : String -> String -> Name
-qualified_name namespace leaf =
+type_name : String -> String -> Name
+type_name namespace leaf =
   NS (mkNamespace namespace) (UN (Basic leaf))
 
 private
 renderer_name : String -> Name
-renderer_name = qualified_name "RendererPrimitives"
+renderer_name = type_name "RendererPrimitives"
 
 private
 float16_source_name : String -> Name
-float16_source_name = qualified_name "Prelude.Float16"
+float16_source_name = type_name "Prelude.Float16"
 
 private
 low_precision_source_name : String -> Name
-low_precision_source_name = qualified_name "Prelude.LowPrecision"
+low_precision_source_name = type_name "Prelude.LowPrecision"
 
 private
 data RendererPrimitive
