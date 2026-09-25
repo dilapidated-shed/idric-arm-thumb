@@ -1,0 +1,272 @@
+module Scalars
+
+import RendererPrimitives
+
+%export "arm-thumb:bits8_identity"
+bits8_identity : Bits8 -> Bits8
+bits8_identity value = value
+
+%export "arm-thumb:bits8_add_test"
+bits8_add_test : Bits8 -> Bits8 -> Bits8
+bits8_add_test left right = left + right
+
+%export "arm-thumb:bits8_sub_test"
+bits8_sub_test : Bits8 -> Bits8 -> Bits8
+bits8_sub_test left right = left - right
+
+%export "arm-thumb:bits8_mul_test"
+bits8_mul_test : Bits8 -> Bits8 -> Bits8
+bits8_mul_test left right = left * right
+
+%export "arm-thumb:float16_identity"
+float16_identity : Float16 -> Float16
+float16_identity value = value
+
+%export "arm-thumb:float16_to_f32_test"
+float16_to_f32_test : Float16 -> Float32
+float16_to_f32_test value = float16_to_float32 value
+
+%export "arm-thumb:f32_to_float16_test"
+f32_to_float16_test : Float32 -> Float16
+f32_to_float16_test value = float32_to_float16 value
+
+%export "arm-thumb:float16_add_test"
+float16_add_test : Float16 -> Float16 -> Float16
+float16_add_test left right = float16_add left right
+
+%export "arm-thumb:float16_sub_test"
+float16_sub_test : Float16 -> Float16 -> Float16
+float16_sub_test left right = float16_subtract left right
+
+%export "arm-thumb:float16_mul_test"
+float16_mul_test : Float16 -> Float16 -> Float16
+float16_mul_test left right = float16_multiply left right
+
+%export "arm-thumb:float16_div_test"
+float16_div_test : Float16 -> Float16 -> Float16
+float16_div_test left right = float16_divide left right
+
+%export "arm-thumb:e4m3_identity"
+e4m3_identity : E4M3 -> E4M3
+e4m3_identity value = value
+
+%export "arm-thumb:e4m3_to_f32_test"
+e4m3_to_f32_test : E4M3 -> Float32
+e4m3_to_f32_test value = e4m3_to_float32 value
+
+%export "arm-thumb:f32_to_e4m3_test"
+f32_to_e4m3_test : Float32 -> E4M3
+f32_to_e4m3_test value = float32_to_e4m3 value
+
+%export "arm-thumb:e4m3_add_test"
+e4m3_add_test : E4M3 -> E4M3 -> E4M3
+e4m3_add_test left right = e4m3_add left right
+
+%export "arm-thumb:e4m3_sub_test"
+e4m3_sub_test : E4M3 -> E4M3 -> E4M3
+e4m3_sub_test left right = e4m3_subtract left right
+
+%export "arm-thumb:e4m3_mul_test"
+e4m3_mul_test : E4M3 -> E4M3 -> E4M3
+e4m3_mul_test left right = e4m3_multiply left right
+
+%export "arm-thumb:e4m3_div_test"
+e4m3_div_test : E4M3 -> E4M3 -> E4M3
+e4m3_div_test left right = e4m3_divide left right
+
+%export "arm-thumb:e5m2_identity"
+e5m2_identity : E5M2 -> E5M2
+e5m2_identity value = value
+
+%export "arm-thumb:e5m2_to_f32_test"
+e5m2_to_f32_test : E5M2 -> Float32
+e5m2_to_f32_test value = e5m2_to_float32 value
+
+%export "arm-thumb:f32_to_e5m2_test"
+f32_to_e5m2_test : Float32 -> E5M2
+f32_to_e5m2_test value = float32_to_e5m2 value
+
+%export "arm-thumb:e5m2_add_test"
+e5m2_add_test : E5M2 -> E5M2 -> E5M2
+e5m2_add_test left right = e5m2_add left right
+
+%export "arm-thumb:e5m2_sub_test"
+e5m2_sub_test : E5M2 -> E5M2 -> E5M2
+e5m2_sub_test left right = e5m2_subtract left right
+
+%export "arm-thumb:e5m2_mul_test"
+e5m2_mul_test : E5M2 -> E5M2 -> E5M2
+e5m2_mul_test left right = e5m2_multiply left right
+
+%export "arm-thumb:e5m2_div_test"
+e5m2_div_test : E5M2 -> E5M2 -> E5M2
+e5m2_div_test left right = e5m2_divide left right
+
+%export "arm-thumb:e3m2_identity"
+e3m2_identity : E3M2 -> E3M2
+e3m2_identity value = value
+
+%export "arm-thumb:e3m2_to_f32_test"
+e3m2_to_f32_test : E3M2 -> Float32
+e3m2_to_f32_test value = e3m2_to_float32 value
+
+%export "arm-thumb:f32_to_e3m2_test"
+f32_to_e3m2_test : Float32 -> E3M2
+f32_to_e3m2_test value = float32_to_e3m2 value
+
+%export "arm-thumb:e3m2_add_test"
+e3m2_add_test : E3M2 -> E3M2 -> E3M2
+e3m2_add_test left right = e3m2_add left right
+
+%export "arm-thumb:e3m2_sub_test"
+e3m2_sub_test : E3M2 -> E3M2 -> E3M2
+e3m2_sub_test left right = e3m2_subtract left right
+
+%export "arm-thumb:e3m2_mul_test"
+e3m2_mul_test : E3M2 -> E3M2 -> E3M2
+e3m2_mul_test left right = e3m2_multiply left right
+
+%export "arm-thumb:e3m2_div_test"
+e3m2_div_test : E3M2 -> E3M2 -> E3M2
+e3m2_div_test left right = e3m2_divide left right
+
+%export "arm-thumb:e3m2_square_test"
+e3m2_square_test : E3M2 -> E3M2
+e3m2_square_test value = e3m2_multiply value value
+
+%export "arm-thumb:e3m2_cube_test"
+e3m2_cube_test : E3M2 -> E3M2
+e3m2_cube_test value =
+  let square = e3m2_multiply value value
+  in e3m2_multiply square value
+
+%export "arm-thumb:e3m2_sqrt_test"
+e3m2_sqrt_test : E3M2 -> E3M2
+e3m2_sqrt_test value =
+  let wide = e3m2_to_float32 value
+      rooted = float32_square_root wide
+  in float32_to_e3m2 rooted
+
+%export "arm-thumb:e3m2_dot2_test"
+e3m2_dot2_test : E3M2 -> E3M2 -> E3M2 -> E3M2 -> E3M2
+e3m2_dot2_test a b x y =
+  let ax = e3m2_multiply a x
+      by = e3m2_multiply b y
+  in e3m2_add ax by
+
+%export "arm-thumb:e3m2_rotate_x_test"
+e3m2_rotate_x_test : E3M2 -> E3M2 -> E3M2 -> E3M2 -> E3M2
+e3m2_rotate_x_test cosine sine x y =
+  let cx = e3m2_multiply cosine x
+      sy = e3m2_multiply sine y
+  in e3m2_subtract cx sy
+
+%export "arm-thumb:e3m2_rotate_y_test"
+e3m2_rotate_y_test : E3M2 -> E3M2 -> E3M2 -> E3M2 -> E3M2
+e3m2_rotate_y_test sine cosine x y =
+  let sx = e3m2_multiply sine x
+      cy = e3m2_multiply cosine y
+  in e3m2_add sx cy
+
+%export "arm-thumb:e5m3_identity"
+e5m3_identity : E5M3 -> E5M3
+e5m3_identity value = value
+
+%export "arm-thumb:e5m3_to_f32_test"
+e5m3_to_f32_test : E5M3 -> Float32
+e5m3_to_f32_test value = e5m3_to_float32 value
+
+%export "arm-thumb:f32_to_e5m3_test"
+f32_to_e5m3_test : Float32 -> E5M3
+f32_to_e5m3_test value = float32_to_e5m3 value
+
+
+%export "arm-thumb:e5m3_add_observe"
+e5m3_add_observe : E5M3 -> E5M3 -> Float32
+e5m3_add_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_add left_wide right_wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_sub_observe"
+e5m3_sub_observe : E5M3 -> E5M3 -> Float32
+e5m3_sub_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_subtract left_wide right_wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_mul_observe"
+e5m3_mul_observe : E5M3 -> E5M3 -> Float32
+e5m3_mul_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_multiply left_wide right_wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_div_observe"
+e5m3_div_observe : E5M3 -> E5M3 -> Float32
+e5m3_div_observe left right =
+  let left_wide = e5m3_to_float32 left
+      right_wide = e5m3_to_float32 right
+      result = float32_divide left_wide right_wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_square_observe"
+e5m3_square_observe : E5M3 -> Float32
+e5m3_square_observe value =
+  let wide = e5m3_to_float32 value
+      result = float32_multiply wide wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_cube_observe"
+e5m3_cube_observe : E5M3 -> Float32
+e5m3_cube_observe value =
+  let wide = e5m3_to_float32 value
+      square = float32_multiply wide wide
+      result = float32_multiply square wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_sqrt_observe"
+e5m3_sqrt_observe : E5M3 -> Float32
+e5m3_sqrt_observe value =
+  let wide = e5m3_to_float32 value
+      result = float32_square_root wide
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_rotate_x_observe"
+e5m3_rotate_x_observe : E5M3 -> E5M3 -> E5M3 -> E5M3 -> Float32
+e5m3_rotate_x_observe cosine sine x y =
+  let c = e5m3_to_float32 cosine
+      s = e5m3_to_float32 sine
+      x_wide = e5m3_to_float32 x
+      y_wide = e5m3_to_float32 y
+      cx = float32_multiply c x_wide
+      sy = float32_multiply s y_wide
+      result = float32_subtract cx sy
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+%export "arm-thumb:e5m3_rotate_y_observe"
+e5m3_rotate_y_observe : E5M3 -> E5M3 -> E5M3 -> E5M3 -> Float32
+e5m3_rotate_y_observe sine cosine x y =
+  let s = e5m3_to_float32 sine
+      c = e5m3_to_float32 cosine
+      x_wide = e5m3_to_float32 x
+      y_wide = e5m3_to_float32 y
+      sx = float32_multiply s x_wide
+      cy = float32_multiply c y_wide
+      result = float32_add sx cy
+      stored = float32_to_e5m3 result
+  in e5m3_to_float32 stored
+
+main : IO ()
+main = pure ()

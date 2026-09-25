@@ -5,6 +5,7 @@ import Compiler.ANF
 import Core.Name
 import Core.Name.Namespace
 import Core.TT.Primitive
+import Data.Vect
 
 %default covering
 
@@ -21,9 +22,14 @@ private
 data RawInstruction
   = RawCopy Int Int
   | RawWordConstant Int Int
+  | RawBits8Constant Int Int
   | RawLoadFloat32 Int Int Int
   | RawFloatBinary FloatBinaryOperation Int Int Int
   | RawFloatUnary FloatUnaryOperation Int Int
+  | RawNarrowToFloat32 NarrowFloatFormat Int Int
+  | RawFloat32ToNarrow NarrowFloatFormat Int Int
+  | RawNarrowBinary NarrowFloatFormat NarrowBinaryOperation Int Int Int
+  | RawBits8Binary Bits8BinaryOperation Int Int Int
 
 private
 record BuildState where
@@ -79,27 +85,55 @@ data RendererPrimitive
   = BufferLoad
   | Binary FloatBinaryOperation
   | Unary FloatUnaryOperation
+  | ToFloat32 NarrowFloatFormat
+  | FromFloat32 NarrowFloatFormat
+  | NarrowBinaryPrimitive NarrowFloatFormat NarrowBinaryOperation
+
+private
+lookup_renderer : Name -> List (Name, RendererPrimitive) -> Maybe RendererPrimitive
+lookup_renderer requested [] = Nothing
+lookup_renderer requested ((candidate, primitive) :: rest) =
+  if requested == candidate then Just primitive else lookup_renderer requested rest
 
 private
 renderer_primitive : Name -> Maybe RendererPrimitive
 renderer_primitive name =
-  if name == renderer_name "float32_buffer_load"
-    then Just BufferLoad
-    else if name == renderer_name "float32_add"
-      then Just (Binary AddFloat32)
-      else if name == renderer_name "float32_subtract"
-        then Just (Binary SubtractFloat32)
-        else if name == renderer_name "float32_multiply"
-          then Just (Binary MultiplyFloat32)
-          else if name == renderer_name "float32_divide"
-            then Just (Binary DivideFloat32)
-            else if name == renderer_name "float32_negate"
-              then Just (Unary NegateFloat32)
-              else if name == renderer_name "float32_absolute"
-                then Just (Unary AbsoluteFloat32)
-                else if name == renderer_name "float32_square_root"
-                  then Just (Unary SquareRootFloat32)
-                  else Nothing
+  lookup_renderer name
+    [ (renderer_name "float32_buffer_load", BufferLoad)
+    , (renderer_name "float32_add", Binary AddFloat32)
+    , (renderer_name "float32_subtract", Binary SubtractFloat32)
+    , (renderer_name "float32_multiply", Binary MultiplyFloat32)
+    , (renderer_name "float32_divide", Binary DivideFloat32)
+    , (renderer_name "float32_negate", Unary NegateFloat32)
+    , (renderer_name "float32_absolute", Unary AbsoluteFloat32)
+    , (renderer_name "float32_square_root", Unary SquareRootFloat32)
+    , (renderer_name "float16_to_float32", ToFloat32 Binary16)
+    , (renderer_name "float32_to_float16", FromFloat32 Binary16)
+    , (renderer_name "e4m3_to_float32", ToFloat32 FP8E4M3)
+    , (renderer_name "float32_to_e4m3", FromFloat32 FP8E4M3)
+    , (renderer_name "e5m2_to_float32", ToFloat32 FP8E5M2)
+    , (renderer_name "float32_to_e5m2", FromFloat32 FP8E5M2)
+    , (renderer_name "e3m2_to_float32", ToFloat32 FP6E3M2)
+    , (renderer_name "float32_to_e3m2", FromFloat32 FP6E3M2)
+    , (renderer_name "e5m3_to_float32", ToFloat32 OotomoE5M3)
+    , (renderer_name "float32_to_e5m3", FromFloat32 OotomoE5M3)
+    , (renderer_name "float16_add", NarrowBinaryPrimitive Binary16 AddNarrow)
+    , (renderer_name "float16_subtract", NarrowBinaryPrimitive Binary16 SubtractNarrow)
+    , (renderer_name "float16_multiply", NarrowBinaryPrimitive Binary16 MultiplyNarrow)
+    , (renderer_name "float16_divide", NarrowBinaryPrimitive Binary16 DivideNarrow)
+    , (renderer_name "e4m3_add", NarrowBinaryPrimitive FP8E4M3 AddNarrow)
+    , (renderer_name "e4m3_subtract", NarrowBinaryPrimitive FP8E4M3 SubtractNarrow)
+    , (renderer_name "e4m3_multiply", NarrowBinaryPrimitive FP8E4M3 MultiplyNarrow)
+    , (renderer_name "e4m3_divide", NarrowBinaryPrimitive FP8E4M3 DivideNarrow)
+    , (renderer_name "e5m2_add", NarrowBinaryPrimitive FP8E5M2 AddNarrow)
+    , (renderer_name "e5m2_subtract", NarrowBinaryPrimitive FP8E5M2 SubtractNarrow)
+    , (renderer_name "e5m2_multiply", NarrowBinaryPrimitive FP8E5M2 MultiplyNarrow)
+    , (renderer_name "e5m2_divide", NarrowBinaryPrimitive FP8E5M2 DivideNarrow)
+    , (renderer_name "e3m2_add", NarrowBinaryPrimitive FP6E3M2 AddNarrow)
+    , (renderer_name "e3m2_subtract", NarrowBinaryPrimitive FP6E3M2 SubtractNarrow)
+    , (renderer_name "e3m2_multiply", NarrowBinaryPrimitive FP6E3M2 MultiplyNarrow)
+    , (renderer_name "e3m2_divide", NarrowBinaryPrimitive FP6E3M2 DivideNarrow)
+    ]
 
 private
 add_constraint : RepresentationConstraint -> BuildState -> BuildState
@@ -174,6 +208,12 @@ add_word_constant destination value state =
     (add_constraint (HasRepresentation destination Word32) state)
 
 private
+add_bits8_constant : Int -> Int -> BuildState -> BuildState
+add_bits8_constant destination value state =
+  add_instruction (RawBits8Constant destination value)
+    (add_constraint (HasRepresentation destination Bits8Value) state)
+
+private
 add_buffer_load : Int -> Int -> Int -> BuildState -> BuildState
 add_buffer_load destination buffer index state =
   add_instruction (RawLoadFloat32 destination buffer index)
@@ -197,6 +237,42 @@ add_float_unary operation destination value state =
   add_instruction (RawFloatUnary operation destination value)
     (add_constraint (HasRepresentation destination Float32)
       (add_constraint (HasRepresentation value Float32) state))
+
+private
+add_narrow_to_float32 :
+  NarrowFloatFormat -> Int -> Int -> BuildState -> BuildState
+add_narrow_to_float32 format destination value state =
+  add_instruction (RawNarrowToFloat32 format destination value)
+    (add_constraint (HasRepresentation destination Float32)
+      (add_constraint (HasRepresentation value (format_representation format)) state))
+
+private
+add_float32_to_narrow :
+  NarrowFloatFormat -> Int -> Int -> BuildState -> BuildState
+add_float32_to_narrow format destination value state =
+  add_instruction (RawFloat32ToNarrow format destination value)
+    (add_constraint (HasRepresentation destination (format_representation format))
+      (add_constraint (HasRepresentation value Float32) state))
+
+private
+add_narrow_binary :
+  NarrowFloatFormat -> NarrowBinaryOperation ->
+  Int -> Int -> Int -> BuildState -> BuildState
+add_narrow_binary format operation destination left right state =
+  let representation = format_representation format in
+    add_instruction (RawNarrowBinary format operation destination left right)
+      (add_constraint (HasRepresentation destination representation)
+        (add_constraint (HasRepresentation left representation)
+          (add_constraint (HasRepresentation right representation) state)))
+
+private
+add_bits8_binary :
+  Bits8BinaryOperation -> Int -> Int -> Int -> BuildState -> BuildState
+add_bits8_binary operation destination left right state =
+  add_instruction (RawBits8Binary operation destination left right)
+    (add_constraint (HasRepresentation destination Bits8Value)
+      (add_constraint (HasRepresentation left Bits8Value)
+        (add_constraint (HasRepresentation right Bits8Value) state)))
 
 private
 lower_external :
@@ -239,6 +315,37 @@ lower_external destination name arguments state =
           Left
             ("Renderer primitive `" ++ show name ++
              "` requires one local operand, got " ++ show arguments)
+    Just (ToFloat32 format) =>
+      case arguments of
+        [ALocal value] => do
+          require_bound (show format ++ " conversion operand") value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_narrow_to_float32 format destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just (FromFloat32 format) =>
+      case arguments of
+        [ALocal value] => do
+          require_bound ("Float32 to " ++ show format ++ " operand") value state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_float32_to_narrow format destination value with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires one local operand, got " ++ show arguments)
+    Just (NarrowBinaryPrimitive format operation) =>
+      case arguments of
+        [ALocal left, ALocal right] => do
+          require_bound (show format ++ " left operand") left state
+          require_bound (show format ++ " right operand") right state
+          with_destination <- bind_variable "Let destination" destination state
+          Right (add_narrow_binary format operation destination left right with_destination)
+        _ =>
+          Left
+            ("Renderer primitive `" ++ show name ++
+             "` requires two local operands, got " ++ show arguments)
 
 private
 lower_value : Int -> ANF -> BuildState -> Either String BuildState
@@ -249,6 +356,33 @@ lower_value destination (AV _ (ALocal source)) state = do
 lower_value destination (APrimVal _ (I32 value)) state = do
   with_destination <- bind_variable "Let destination" destination state
   Right (add_word_constant destination (cast value) with_destination)
+lower_value destination (APrimVal _ (B8 value)) state = do
+  with_destination <- bind_variable "Let destination" destination state
+  Right (add_bits8_constant destination (cast value) with_destination)
+lower_value destination (AOp _ _ (Add Bits8Type) arguments) state =
+  case toList arguments of
+    [ALocal left, ALocal right] => do
+      require_bound "Bits8 add left operand" left state
+      require_bound "Bits8 add right operand" right state
+      with_destination <- bind_variable "Let destination" destination state
+      Right (add_bits8_binary AddBits8 destination left right with_destination)
+    _ => Left "Bits8 add did not have two local operands"
+lower_value destination (AOp _ _ (Sub Bits8Type) arguments) state =
+  case toList arguments of
+    [ALocal left, ALocal right] => do
+      require_bound "Bits8 subtract left operand" left state
+      require_bound "Bits8 subtract right operand" right state
+      with_destination <- bind_variable "Let destination" destination state
+      Right (add_bits8_binary SubtractBits8 destination left right with_destination)
+    _ => Left "Bits8 subtract did not have two local operands"
+lower_value destination (AOp _ _ (Mul Bits8Type) arguments) state =
+  case toList arguments of
+    [ALocal left, ALocal right] => do
+      require_bound "Bits8 multiply left operand" left state
+      require_bound "Bits8 multiply right operand" right state
+      with_destination <- bind_variable "Let destination" destination state
+      Right (add_bits8_binary MultiplyBits8 destination left right with_destination)
+    _ => Left "Bits8 multiply did not have two local operands"
 lower_value destination (APrimVal _ (I value)) state =
   Left
     ("Idriç Int is 64-bit in the pinned compiler; use Int32 in this " ++
@@ -377,6 +511,10 @@ resolve_instruction slots constraints (RawWordConstant destination value) = do
   destination_local <- resolve_local slots constraints destination
   expect_representation "Word constant" Word32 destination_local
   Right (WordConstant destination_local value)
+resolve_instruction slots constraints (RawBits8Constant destination value) = do
+  destination_local <- resolve_local slots constraints destination
+  expect_representation "Bits8 constant" Bits8Value destination_local
+  Right (Bits8Constant destination_local value)
 resolve_instruction slots constraints (RawLoadFloat32 destination buffer index) = do
   destination_local <- resolve_local slots constraints destination
   buffer_local <- resolve_local slots constraints buffer
@@ -399,6 +537,37 @@ resolve_instruction slots constraints (RawFloatUnary operation destination value
   expect_representation "Float unary result" Float32 destination_local
   expect_representation "Float unary operand" Float32 value_local
   Right (FloatUnary operation destination_local value_local)
+resolve_instruction slots constraints (RawNarrowToFloat32 format destination value) = do
+  destination_local <- resolve_local slots constraints destination
+  value_local <- resolve_local slots constraints value
+  expect_representation "Narrow conversion result" Float32 destination_local
+  expect_representation "Narrow conversion operand"
+    (format_representation format) value_local
+  Right (NarrowToFloat32 format destination_local value_local)
+resolve_instruction slots constraints (RawFloat32ToNarrow format destination value) = do
+  destination_local <- resolve_local slots constraints destination
+  value_local <- resolve_local slots constraints value
+  expect_representation "Narrow conversion result"
+    (format_representation format) destination_local
+  expect_representation "Narrow conversion operand" Float32 value_local
+  Right (Float32ToNarrow format destination_local value_local)
+resolve_instruction slots constraints (RawNarrowBinary format operation destination left right) = do
+  destination_local <- resolve_local slots constraints destination
+  left_local <- resolve_local slots constraints left
+  right_local <- resolve_local slots constraints right
+  let representation = format_representation format
+  expect_representation "Narrow binary result" representation destination_local
+  expect_representation "Narrow binary left operand" representation left_local
+  expect_representation "Narrow binary right operand" representation right_local
+  Right (NarrowBinary format operation destination_local left_local right_local)
+resolve_instruction slots constraints (RawBits8Binary operation destination left right) = do
+  destination_local <- resolve_local slots constraints destination
+  left_local <- resolve_local slots constraints left
+  right_local <- resolve_local slots constraints right
+  expect_representation "Bits8 binary result" Bits8Value destination_local
+  expect_representation "Bits8 binary left operand" Bits8Value left_local
+  expect_representation "Bits8 binary right operand" Bits8Value right_local
+  Right (Bits8Binary operation destination_local left_local right_local)
 
 private
 resolve_instructions :
@@ -442,6 +611,17 @@ resolve_function symbol argument_variables result_variable result_representation
     (MkLeafFunction symbol arguments instructions result
       (aligned_frame_bytes state.next_slot))
 
+private
+is_scalar_result : Representation -> Bool
+is_scalar_result Float32 = True
+is_scalar_result Bits8Value = True
+is_scalar_result Float16Value = True
+is_scalar_result E4M3Value = True
+is_scalar_result E5M2Value = True
+is_scalar_result E3M2Value = True
+is_scalar_result E5M3Value = True
+is_scalar_result _ = False
+
 ||| Validate and lower one exported ANF function into representation-tagged IR.
 public export
 lower_leaf :
@@ -450,11 +630,11 @@ lower_leaf :
 lower_leaf requested_symbol argument_representations result_representation
            (MkAFun argument_variables body) = do
   symbol <- validate_external_symbol requested_symbol
-  if result_representation /= Float32
+  if not (is_scalar_result result_representation)
     then
       Left
         ("Export `" ++ symbol ++
-         "` must return RendererPrimitives.Float32, not " ++
+         "` must return a supported scalar value, not " ++
          show result_representation)
     else if length argument_variables > 4
       then Left ("Export `" ++ symbol ++ "` has more than four 32-bit softfp ABI arguments")

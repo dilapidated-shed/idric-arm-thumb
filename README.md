@@ -93,3 +93,12 @@ FP16 arithmetic, maps the latter onto the public A55 FP/NEON pipeline and timing
 data, and records E4M3/E5M2 as existing candidates for a deliberately coarser
 numeric primitive. This is research, not a change to the accepted Armv7-A
 backend contract.
+
+
+## Compact arithmetic experiment
+
+The current E3M2 path is being measured as-is. A possible later experiment with
+wider temporary computational headroom is deliberately deferred; it is not the
+selected policy. See
+[`notes/compact-storage-wider-computation.md`](notes/compact-storage-wider-computation.md)
+and issue #98.

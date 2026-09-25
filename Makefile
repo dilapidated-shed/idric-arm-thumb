@@ -15,7 +15,12 @@ AFFINE_ASSEMBLY := build/exec/affine.arm-thumb.S
 AFFINE_OBJECT := build/exec/affine.arm-thumb.o
 OPERATIONS_ASSEMBLY := build/exec/operations.arm-thumb.S
 OPERATIONS_OBJECT := build/exec/operations.arm-thumb.o
+SCALARS_ASSEMBLY := build/exec/scalars.arm-thumb.S
+SCALARS_OBJECT := build/exec/scalars.arm-thumb.o
 SELFTEST := build/exec/backend-selftest
+SCALAR_SELFTEST := build/exec/scalar-selftest
+E3M2_OBSERVER := build/exec/e3m2-observer
+E5M3_OBSERVER := build/exec/e5m3-observer
 INVALID_INT_LOG := build/exec/invalid-int.log
 TOO_MANY_ARGS_LOG := build/exec/too-many-args.log
 INVALID_RESULT_LOG := build/exec/invalid-result.log
@@ -24,8 +29,8 @@ DETERMINISM_B := build/exec/determinism-b.arm-thumb.S
 
 .PHONY: check-compiler check driver print-ascii print-ascii-test examples inspect \
 	reject reject-invalid-int reject-too-many-args reject-invalid-result assemble abi \
-	semantic determinism source-test lowering-test assembly-test semantic-test \
-	determinism-test numerical-test branching-spec-test test verify clean
+	semantic scalar-semantic determinism source-test lowering-test assembly-test semantic-test \
+	determinism-test numerical-test branching-spec-test e3m2-observe e5m3-observe test verify clean
 
 check-compiler:
 	@$(IDRIC) --version | grep -q '$(IDRIC_REVISION)' || { \
@@ -79,7 +84,11 @@ $(OPERATIONS_ASSEMBLY): $(DRIVER) examples/Operations.idric
 	IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
 		./$(DRIVER) --cg arm-thumb --source-dir examples examples/Operations.idric -o operations
 
-examples: $(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY)
+$(SCALARS_ASSEMBLY): $(DRIVER) examples/Scalars.idric
+	IDRIS2_PATH="$(CURDIR)/build/ttc:${IDRIS2_PATH}" \
+		./$(DRIVER) --cg arm-thumb --source-dir examples examples/Scalars.idric -o scalars
+
+examples: $(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY) $(SCALARS_ASSEMBLY)
 
 inspect: examples
 	grep -q '^evaluate_affine:' $(AFFINE_ASSEMBLY)
@@ -99,6 +108,16 @@ inspect: examples
 	grep -q '^float32_first:' $(OPERATIONS_ASSEMBLY)
 	grep -q '^float32_fourth:' $(OPERATIONS_ASSEMBLY)
 	grep -q '^float32_sum_four:' $(OPERATIONS_ASSEMBLY)
+	grep -q '^bits8_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^float16_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^e4m3_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^e5m2_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^e3m2_add_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^e5m3_to_f32_test:' $(SCALARS_ASSEMBLY)
+	grep -q '^\.Lscalar_decode_generic:' $(SCALARS_ASSEMBLY)
+	grep -q '^\.Lscalar_encode_generic:' $(SCALARS_ASSEMBLY)
+	grep -q 'uxtb' $(SCALARS_ASSEMBLY)
+	grep -q 'uxth' $(SCALARS_ASSEMBLY)
 	grep -q 'vsub.f32' $(OPERATIONS_ASSEMBLY)
 	grep -q 'vdiv.f32' $(OPERATIONS_ASSEMBLY)
 	grep -q 'vneg.f32' $(OPERATIONS_ASSEMBLY)
@@ -108,40 +127,31 @@ inspect: examples
 	grep -q 'movw' $(OPERATIONS_ASSEMBLY)
 
 reject-invalid-int: $(DRIVER) tests/source/InvalidInt.idric
-	@set -e; \
-	if IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
+	@rm -f build/exec/invalid_int.arm-thumb.S
+	@IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
 		./$(DRIVER) --cg arm-thumb --source-dir tests/source \
-		tests/source/InvalidInt.idric -o invalid_int > $(INVALID_INT_LOG) 2>&1; then \
-		cat $(INVALID_INT_LOG); \
-		echo 'Expected 64-bit Int source ABI to be rejected'; \
-		exit 1; \
-	fi
+		tests/source/InvalidInt.idric -o invalid_int > $(INVALID_INT_LOG) 2>&1 || true
 	grep -q 'arm-thumb rejected source ABI' $(INVALID_INT_LOG)
 	grep -q 'unsupported source primitive type' $(INVALID_INT_LOG)
+	@test ! -e build/exec/invalid_int.arm-thumb.S
 
 reject-too-many-args: $(DRIVER) tests/source/TooManyArgs.idric
-	@set -e; \
-	if IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
+	@rm -f build/exec/too_many_args.arm-thumb.S
+	@IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
 		./$(DRIVER) --cg arm-thumb --source-dir tests/source \
-		tests/source/TooManyArgs.idric -o too_many_args > $(TOO_MANY_ARGS_LOG) 2>&1; then \
-		cat $(TOO_MANY_ARGS_LOG); \
-		echo 'Expected five-word source ABI to be rejected'; \
-		exit 1; \
-	fi
+		tests/source/TooManyArgs.idric -o too_many_args > $(TOO_MANY_ARGS_LOG) 2>&1 || true
 	grep -q 'arm-thumb rejected source ABI' $(TOO_MANY_ARGS_LOG)
 	grep -q 'more than four one-word arguments' $(TOO_MANY_ARGS_LOG)
+	@test ! -e build/exec/too_many_args.arm-thumb.S
 
 reject-invalid-result: $(DRIVER) tests/source/InvalidResult.idric
-	@set -e; \
-	if IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
+	@rm -f build/exec/invalid_result.arm-thumb.S
+	@IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
 		./$(DRIVER) --cg arm-thumb --source-dir tests/source \
-		tests/source/InvalidResult.idric -o invalid_result > $(INVALID_RESULT_LOG) 2>&1; then \
-		cat $(INVALID_RESULT_LOG); \
-		echo 'Expected non-Float32 result ABI to be rejected'; \
-		exit 1; \
-	fi
+		tests/source/InvalidResult.idric -o invalid_result > $(INVALID_RESULT_LOG) 2>&1 || true
 	grep -q 'arm-thumb rejected source ABI' $(INVALID_RESULT_LOG)
-	grep -q 'result must be RendererPrimitives.Float32' $(INVALID_RESULT_LOG)
+	grep -q 'result must be a supported scalar value' $(INVALID_RESULT_LOG)
+	@test ! -e build/exec/invalid_result.arm-thumb.S
 
 reject: reject-invalid-int reject-too-many-args reject-invalid-result
 
@@ -153,11 +163,16 @@ $(OPERATIONS_OBJECT): $(OPERATIONS_ASSEMBLY)
 	$(ARM_CLANG) --target=$(ARM_TARGET) -c -fPIC -march=armv7-a -mthumb \
 		-mfpu=vfpv3-d16 -mfloat-abi=softfp $(OPERATIONS_ASSEMBLY) -o $(OPERATIONS_OBJECT)
 
-assemble: $(AFFINE_OBJECT) $(OPERATIONS_OBJECT)
+$(SCALARS_OBJECT): $(SCALARS_ASSEMBLY)
+	$(ARM_CLANG) --target=$(ARM_TARGET) -c -fPIC -march=armv7-a -mthumb \
+		-mfpu=vfpv3-d16 -mfloat-abi=softfp $(SCALARS_ASSEMBLY) -o $(SCALARS_OBJECT)
+
+assemble: $(AFFINE_OBJECT) $(OPERATIONS_OBJECT) $(SCALARS_OBJECT)
 
 abi: assemble
 	file $(AFFINE_OBJECT) | grep -q 'ELF 32-bit.*ARM'
 	file $(OPERATIONS_OBJECT) | grep -q 'ELF 32-bit.*ARM'
+	file $(SCALARS_OBJECT) | grep -q 'ELF 32-bit.*ARM'
 	readelf -h $(AFFINE_OBJECT) | grep -q 'Class:.*ELF32'
 	readelf -h $(AFFINE_OBJECT) | grep -q 'Machine:.*ARM'
 	readelf -A $(AFFINE_OBJECT) | grep -q 'Tag_THUMB_ISA_use: Thumb-2'
@@ -166,8 +181,12 @@ abi: assemble
 	readelf -sW $(OPERATIONS_OBJECT) | grep -q 'float32_load_test'
 	readelf -sW $(OPERATIONS_OBJECT) | grep -q 'float32_fourth'
 	readelf -sW $(OPERATIONS_OBJECT) | grep -q 'float32_sum_four'
-	@test -z "$$(nm -u $(AFFINE_OBJECT))"
-	@test -z "$$(nm -u $(OPERATIONS_OBJECT))"
+	readelf -sW $(SCALARS_OBJECT) | grep -q 'float16_add_test'
+	readelf -sW $(SCALARS_OBJECT) | grep -q 'e4m3_add_test'
+	readelf -sW $(SCALARS_OBJECT) | grep -q 'e5m3_to_f32_test'
+	@test -z "$(nm -u $(AFFINE_OBJECT))"
+	@test -z "$(nm -u $(OPERATIONS_OBJECT))"
+	@test -z "$(nm -u $(SCALARS_OBJECT))"
 
 $(SELFTEST): $(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY) tests/arm/backend_selftest.S
 	$(ARM_CLANG) --target=$(ARM_EXEC_TARGET) -fuse-ld=lld -nostdlib -static \
@@ -179,6 +198,34 @@ $(SELFTEST): $(AFFINE_ASSEMBLY) $(OPERATIONS_ASSEMBLY) tests/arm/backend_selftes
 semantic: $(SELFTEST)
 	file $(SELFTEST) | grep -q 'ELF 32-bit.*ARM'
 	$(QEMU_ARM) -cpu cortex-a9 $(SELFTEST)
+
+$(SCALAR_SELFTEST): $(SCALARS_ASSEMBLY) tests/arm/scalar_selftest.S
+	$(ARM_CLANG) --target=$(ARM_EXEC_TARGET) -fuse-ld=lld -nostdlib -static \
+		-march=armv7-a -mthumb -mfpu=vfpv3-d16 -mfloat-abi=softfp \
+		-Wl,-e,_start -Wl,--no-dynamic-linker \
+		$(SCALARS_ASSEMBLY) tests/arm/scalar_selftest.S -o $(SCALAR_SELFTEST)
+
+scalar-semantic: $(SCALAR_SELFTEST)
+	file $(SCALAR_SELFTEST) | grep -q 'ELF 32-bit.*ARM'
+	$(QEMU_ARM) -cpu cortex-a9 $(SCALAR_SELFTEST)
+
+$(E3M2_OBSERVER): $(SCALARS_ASSEMBLY) tests/arm/e3m2_observer.S
+	$(ARM_CLANG) --target=$(ARM_EXEC_TARGET) -fuse-ld=lld -nostdlib -static \
+		-march=armv7-a -mthumb -mfpu=vfpv3-d16 -mfloat-abi=softfp \
+		-Wl,-e,_start -Wl,--no-dynamic-linker \
+		$(SCALARS_ASSEMBLY) tests/arm/e3m2_observer.S -o $(E3M2_OBSERVER)
+
+e3m2-observe: $(E3M2_OBSERVER)
+	python3 tests/arm/observe_e3m2.py "$(QEMU_ARM)" "$(E3M2_OBSERVER)"
+
+$(E5M3_OBSERVER): $(SCALARS_ASSEMBLY) tests/arm/e5m3_observer.S
+	$(ARM_CLANG) --target=$(ARM_EXEC_TARGET) -fuse-ld=lld -nostdlib -static \
+		-march=armv7-a -mthumb -mfpu=vfpv3-d16 -mfloat-abi=softfp \
+		-Wl,-e,_start -Wl,--no-dynamic-linker \
+		$(SCALARS_ASSEMBLY) tests/arm/e5m3_observer.S -o $(E5M3_OBSERVER)
+
+e5m3-observe: $(E5M3_OBSERVER)
+	python3 tests/arm/observe_e5m3.py "$(QEMU_ARM)" "$(E5M3_OBSERVER)"
 
 $(DETERMINISM_A): $(DRIVER) examples/Operations.idric
 	IDRIS2_PATH="$(CURDIR)/build/ttc:$${IDRIS2_PATH}" \
@@ -206,7 +253,7 @@ determinism-test: determinism
 
 # Preserve the broader numerical suite, but do not let it block the first
 # executable-program milestone while its inherited failures are being repaired.
-numerical-test: source-test lowering-test assembly-test semantic-test determinism-test
+numerical-test: scalar-semantic e3m2-observe e5m3-observe source-test lowering-test assembly-test semantic-test determinism-test
 
 # The boring green gate: one real Idriç source program, one Thumb executable,
 # exact one-byte observable behavior.
