@@ -118,14 +118,14 @@ def main() -> int:
     print(f"theta={math.degrees(theta):.9f} deg  "
           f"sin={math.sin(theta):.9f}  cos={math.cos(theta):.9f}  "
           f"caster_multiplier={caster_multiplier:.9f}")
-    print("The numeric residue is observed - reference; it is reported, not graded.")
+    print("The numeric residual is observed - reference; it is reported, not graded.")
     print()
-    print(f"{'case':31} {'payload':>7} {'reference':>12} {'observed':>12} {'residue':>12}")
+    print(f"{'case':31} {'payload':>7} {'reference':>12} {'observed':>12} {'residual':>12}")
     for (label, reference), payload in zip(cases, run.stdout):
         observed = e3m2_decode(payload)
-        residue = observed - reference
+        residual = observed - reference
         print(f"{label:31} 0x{payload:02x} {reference_text(reference):>12} "
-              f"{dyadic(observed):>12} {reference_text(residue):>12}")
+              f"{dyadic(observed):>12} {reference_text(residual):>12}")
 
     print()
     print("Dakota 14x26 Jacobian exercise:")
